@@ -54,6 +54,7 @@ MAX_USD_HISTORY = 11
 USD_POLL_INTERVAL = 0.3
 BROADCAST_DEBOUNCE = 0.001
 MAX_CONNECTIONS = 500
+BROADCAST_CHUNK_SIZE = 100
 STATE_CACHE_TTL = 0.02
 
 SECRET_KEY = os.environ.get("ADMIN_SECRET", "indonesia")
@@ -62,6 +63,7 @@ MAX_LIMIT = 88888
 RATE_LIMIT_SECONDS = 5
 MAX_FAILED_ATTEMPTS = 5
 BLOCK_DURATION = 300
+
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX_REQUESTS = 60
 RATE_LIMIT_STRICT_MAX = 120
@@ -72,98 +74,168 @@ usd_idr_history: deque = deque(maxlen=MAX_USD_HISTORY)
 last_buy: Optional[int] = None
 shown_updates: Set[str] = set()
 limit_bulan: int = 8
+
 failed_attempts: dict = {}
 blocked_ips: dict = {}
 last_successful_call: float = 0
 
-SUSPICIOUS_PATHS = {"/admin", "/login", "/wp-admin", "/phpmyadmin", "/.env", "/config", "/api/admin", "/administrator", "/wp-login", "/backup", "/.git", "/shell", "/cmd", "/exec", "/eval", "/system", "/passwd", "/etc"}
+SUSPICIOUS_PATHS = {
+    "/admin", "/login", "/wp-admin", "/phpmyadmin", "/.env", "/config",
+    "/api/admin", "/administrator", "/wp-login", "/backup", "/.git",
+    "/shell", "/cmd", "/exec", "/eval", "/system", "/passwd", "/etc",
+}
+
+HARI_INDO = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
 
 aiohttp_session: Optional["aiohttp.ClientSession"] = None
 treasury_ws: Optional[aiohttp.ClientWebSocketResponse] = None
 treasury_ws_connected: bool = False
 
-HTML_RATE_LIMITED = """<!DOCTYPE html><html><head><title>429</title></head><body><h1>Too Many Requests</h1></body></html>"""
+HTML_RATE_LIMITED = """<!DOCTYPE html>
+<html><head><title>429 Too Many Requests</title></head>
+<body><h1>Too Many Requests</h1><p>Silakan coba lagi nanti.</p></body></html>"""
 
 
 class RateLimiter:
-    __slots__ = ('_requests', '_last_cleanup')
+    __slots__ = ('_requests', '_lock', '_last_cleanup')
+    
     def __init__(self):
         self._requests: dict = {}
+        self._lock = asyncio.Lock()
         self._last_cleanup: float = 0
-    def _cleanup(self, now: float):
+    
+    def _cleanup_old_entries(self, now: float):
         if now - self._last_cleanup < 30:
             return
         cutoff = now - RATE_LIMIT_WINDOW
-        for ip in list(self._requests.keys()):
-            self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
+        ips_to_delete = []
+        for ip, timestamps in self._requests.items():
+            self._requests[ip] = [t for t in timestamps if t > cutoff]
             if not self._requests[ip]:
-                del self._requests[ip]
+                ips_to_delete.append(ip)
+        for ip in ips_to_delete:
+            del self._requests[ip]
         self._last_cleanup = now
-    def check(self, ip: str) -> tuple:
+    
+    def check_rate_limit(self, ip: str) -> tuple:
         now = time.time()
-        self._cleanup(now)
+        self._cleanup_old_entries(now)
+        
         if ip not in self._requests:
             self._requests[ip] = []
+        
         cutoff = now - RATE_LIMIT_WINDOW
         self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
-        count = len(self._requests[ip])
-        if count >= RATE_LIMIT_STRICT_MAX:
-            return False, count, "blocked"
-        if count >= RATE_LIMIT_MAX_REQUESTS:
-            return False, count, "limited"
+        
+        request_count = len(self._requests[ip])
+        
+        if request_count >= RATE_LIMIT_STRICT_MAX:
+            return False, request_count, "blocked"
+        
+        if request_count >= RATE_LIMIT_MAX_REQUESTS:
+            return False, request_count, "limited"
+        
         self._requests[ip].append(now)
-        return True, count + 1, "ok"
+        return True, request_count + 1, "ok"
+    
+    def get_stats(self, ip: str) -> dict:
+        now = time.time()
+        cutoff = now - RATE_LIMIT_WINDOW
+        if ip in self._requests:
+            count = len([t for t in self._requests[ip] if t > cutoff])
+        else:
+            count = 0
+        return {
+            "ip": ip,
+            "requests_in_window": count,
+            "limit": RATE_LIMIT_MAX_REQUESTS,
+            "window_seconds": RATE_LIMIT_WINDOW
+        }
+
 
 rate_limiter = RateLimiter()
 
 
 class StateCache:
-    __slots__ = ('_cache', '_cache_time', '_lock')
+    __slots__ = ('_cache', '_cache_time', '_lock', '_version')
+    
     def __init__(self):
         self._cache: Optional[bytes] = None
         self._cache_time: float = 0
         self._lock = asyncio.Lock()
+        self._version: int = 0
+    
     def invalidate(self):
+        self._version += 1
         self._cache = None
-    async def get(self) -> bytes:
+    
+    async def get_state_bytes(self) -> bytes:
         now = asyncio.get_event_loop().time()
         if self._cache and (now - self._cache_time) < STATE_CACHE_TTL:
             return self._cache
         async with self._lock:
             if self._cache and (now - self._cache_time) < STATE_CACHE_TTL:
                 return self._cache
-            self._cache = build_state_bytes()
+            self._cache = build_full_state_bytes()
             self._cache_time = now
             return self._cache
+    
+    def get_state_bytes_sync(self) -> bytes:
+        if self._cache:
+            return self._cache
+        self._cache = build_full_state_bytes()
+        self._cache_time = asyncio.get_event_loop().time()
+        return self._cache
+
 
 state_cache = StateCache()
 
 
 class ConnectionManager:
-    __slots__ = ('_connections',)
+    __slots__ = ('_connections', '_write_lock')
+    
     def __init__(self):
         self._connections: Set[WebSocket] = set()
+        self._write_lock = asyncio.Lock()
+    
     async def connect(self, ws: WebSocket) -> bool:
         if len(self._connections) >= MAX_CONNECTIONS:
             return False
         self._connections.add(ws)
         return True
+    
     def disconnect(self, ws: WebSocket):
         self._connections.discard(ws)
+    
     @property
     def count(self) -> int:
         return len(self._connections)
+    
     async def broadcast(self, message: bytes):
         if not self._connections:
             return
+        connections = list(self._connections)
         failed = []
-        for ws in list(self._connections):
-            try:
-                await asyncio.wait_for(ws.send_bytes(message), timeout=3.0)
-            except:
+        
+        results = await asyncio.gather(
+            *[self._send_safe(ws, message) for ws in connections],
+            return_exceptions=True
+        )
+        
+        for ws, result in zip(connections, results):
+            if result is False or isinstance(result, Exception):
                 failed.append(ws)
+        
         for ws in failed:
             self.disconnect(ws)
+    
+    async def _send_safe(self, ws: WebSocket, message: bytes) -> bool:
+        try:
+            await asyncio.wait_for(ws.send_bytes(message), timeout=3.0)
+            return True
+        except:
+            return False
+
 
 manager = ConnectionManager()
 
@@ -174,112 +246,181 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+
 def is_ip_blocked(ip: str) -> bool:
     if ip in blocked_ips:
         if time.time() < blocked_ips[ip]:
             return True
         del blocked_ips[ip]
-        failed_attempts.pop(ip, None)
+        if ip in failed_attempts:
+            del failed_attempts[ip]
     return False
+
 
 def block_ip(ip: str, duration: int = BLOCK_DURATION):
     blocked_ips[ip] = time.time() + duration
 
-def record_failed(ip: str, weight: int = 1):
+
+def record_failed_attempt(ip: str, weight: int = 1):
     now = time.time()
     if ip not in failed_attempts:
         failed_attempts[ip] = []
-    failed_attempts[ip].extend([now] * weight)
+    for _ in range(weight):
+        failed_attempts[ip].append(now)
     failed_attempts[ip] = [t for t in failed_attempts[ip] if now - t < 60]
     if len(failed_attempts[ip]) >= MAX_FAILED_ATTEMPTS:
         block_ip(ip)
 
+
 def verify_secret(key: str) -> bool:
     return secrets.compare_digest(key, SECRET_KEY)
 
-def is_suspicious(path: str) -> bool:
-    pl = path.lower()
-    return any(s in pl for s in SUSPICIOUS_PATHS)
+
+def is_suspicious_path(path: str) -> bool:
+    path_lower = path.lower()
+    for suspicious in SUSPICIOUS_PATHS:
+        if suspicious in path_lower:
+            return True
+    return False
+
 
 @lru_cache(maxsize=1024)
 def format_rupiah(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
+
 @lru_cache(maxsize=512)
 def get_time_only(date_str: str) -> str:
     try:
-        return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").strftime('%H:%M:%S')
+        dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        return dt.strftime('%H:%M:%S')
     except:
         return date_str
 
-def format_waktu(date_str: str, status: str) -> str:
+
+def format_waktu_only(date_str: str, status: str) -> str:
     return f"{get_time_only(date_str)}{status}"
 
+
 @lru_cache(maxsize=256)
-def format_diff(diff: int, status: str) -> str:
+def format_diff_display(diff: int, status: str) -> str:
     if status == "🚀":
         return f"🚀+{format_rupiah(diff)}"
     elif status == "🔻":
         return f"🔻-{format_rupiah(abs(diff))}"
     return "➖tetap"
 
-PROFIT_CONFIGS = [(10000000, 9669000), (20000000, 19330000), (30000000, 28995000), (40000000, 38660000), (50000000, 48325000)]
+
+def format_transaction_display(buy: str, sell: str, diff_display: str) -> str:
+    return f"Beli: {buy}<br>Jual: {sell}<br>{diff_display}"
+
+
+PROFIT_CONFIGS = [
+    (10000000, 9669000),
+    (20000000, 19330000),
+    (30000000, 28995000),
+    (40000000, 38660000),
+    (50000000, 48325000),
+]
+
 
 def calc_profit(h: dict, modal: int, pokok: int) -> str:
     try:
-        gram = modal / h["buying_rate"]
-        val = int(gram * h["selling_rate"] - pokok)
-        gs = f"{gram:,.4f}".replace(",", ".")
+        buy_rate = h["buying_rate"]
+        sell_rate = h["selling_rate"]
+        gram = modal / buy_rate
+        val = int(gram * sell_rate - pokok)
+        gram_str = f"{gram:,.4f}".replace(",", ".")
         if val > 0:
-            return f"+{format_rupiah(val)}🟢{gs}gr"
+            return f"+{format_rupiah(val)}🟢{gram_str}gr"
         elif val < 0:
-            return f"-{format_rupiah(abs(val))}🔴{gs}gr"
-        return f"0➖{gs}gr"
+            return f"-{format_rupiah(abs(val))}🔴{gram_str}gr"
+        return f"{format_rupiah(0)}➖{gram_str}gr"
     except:
         return "-"
 
-def build_history_item(h: dict) -> dict:
-    bf = format_rupiah(h["buying_rate"])
-    sf = format_rupiah(h["selling_rate"])
-    dd = format_diff(h.get("diff", 0), h["status"])
+
+def build_single_history_item(h: dict) -> dict:
+    buy_fmt = format_rupiah(h["buying_rate"])
+    sell_fmt = format_rupiah(h["selling_rate"])
+    diff_display = format_diff_display(h.get("diff", 0), h["status"])
     return {
-        "buying_rate": bf, "selling_rate": sf,
-        "buying_rate_raw": h["buying_rate"], "selling_rate_raw": h["selling_rate"],
-        "waktu_display": format_waktu(h["created_at"], h["status"]),
-        "diff_display": dd, "created_at": h["created_at"],
-        "jt10": calc_profit(h, *PROFIT_CONFIGS[0]), "jt20": calc_profit(h, *PROFIT_CONFIGS[1]),
-        "jt30": calc_profit(h, *PROFIT_CONFIGS[2]), "jt40": calc_profit(h, *PROFIT_CONFIGS[3]),
+        "buying_rate": buy_fmt,
+        "selling_rate": sell_fmt,
+        "buying_rate_raw": h["buying_rate"],
+        "selling_rate_raw": h["selling_rate"],
+        "waktu_display": format_waktu_only(h["created_at"], h["status"]),
+        "diff_display": diff_display,
+        "transaction_display": format_transaction_display(buy_fmt, sell_fmt, diff_display),
+        "created_at": h["created_at"],
+        "jt10": calc_profit(h, *PROFIT_CONFIGS[0]),
+        "jt20": calc_profit(h, *PROFIT_CONFIGS[1]),
+        "jt30": calc_profit(h, *PROFIT_CONFIGS[2]),
+        "jt40": calc_profit(h, *PROFIT_CONFIGS[3]),
         "jt50": calc_profit(h, *PROFIT_CONFIGS[4]),
     }
 
-def build_state_bytes() -> bytes:
+
+def build_history_data() -> List[dict]:
+    return [build_single_history_item(h) for h in history]
+
+
+def build_usd_idr_data() -> List[dict]:
+    return [{"price": h["price"], "time": h["time"]} for h in usd_idr_history]
+
+
+def build_full_state_bytes() -> bytes:
     return json_dumps_bytes({
-        "history": [build_history_item(h) for h in history],
-        "usd_idr_history": [{"price": h["price"], "time": h["time"]} for h in usd_idr_history],
+        "history": build_history_data(),
+        "usd_idr_history": build_usd_idr_data(),
         "limit_bulan": limit_bulan
     })
 
-async def get_session() -> "aiohttp.ClientSession":
+
+async def get_aiohttp_session() -> "aiohttp.ClientSession":
     global aiohttp_session
     if aiohttp_session is None or aiohttp_session.closed:
+        timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=20)
+        connector = aiohttp.TCPConnector(
+            limit=150,
+            limit_per_host=50,
+            keepalive_timeout=120,
+            enable_cleanup_closed=True,
+            force_close=False,
+            ttl_dns_cache=300,
+        )
         aiohttp_session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30, connect=10),
-            connector=aiohttp.TCPConnector(limit=100, ttl_dns_cache=300),
-            headers={"User-Agent": "Mozilla/5.0"}
+            timeout=timeout,
+            connector=connector,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            raise_for_status=False
         )
     return aiohttp_session
 
-async def close_session():
+
+async def close_aiohttp_session():
     global aiohttp_session, treasury_ws
     if treasury_ws and not treasury_ws.closed:
         await treasury_ws.close()
+        treasury_ws = None
     if aiohttp_session and not aiohttp_session.closed:
         await aiohttp_session.close()
+        await asyncio.sleep(0.1)
+        aiohttp_session = None
 
-async def fetch_usd_idr() -> Optional[str]:
+
+_google_headers = {"Accept": "text/html,application/xhtml+xml"}
+_google_cookies = {"CONSENT": "YES+cb.20231208-04-p0.en+FX+410"}
+
+
+async def fetch_usd_idr_price() -> Optional[str]:
     try:
-        session = await get_session()
-        async with session.get("https://www.google.com/finance/quote/USD-IDR", headers={"Accept": "text/html"}, cookies={"CONSENT": "YES+"}) as resp:
+        session = await get_aiohttp_session()
+        async with session.get(
+            "https://www.google.com/finance/quote/USD-IDR",
+            headers=_google_headers,
+            cookies=_google_cookies
+        ) as resp:
             if resp.status == 200:
                 text = await resp.text()
                 if USE_LXML:
@@ -297,101 +438,209 @@ async def fetch_usd_idr() -> Optional[str]:
     return None
 
 
-class Debouncer:
-    __slots__ = ('_pending', '_lock')
+class BroadcastDebouncer:
+    __slots__ = ('_pending', '_lock', '_last_broadcast')
+    
     def __init__(self):
         self._pending = False
         self._lock = asyncio.Lock()
-    async def schedule(self):
+        self._last_broadcast: float = 0
+    
+    async def schedule_broadcast(self):
         async with self._lock:
             if self._pending:
                 return
             self._pending = True
+        
         state_cache.invalidate()
         await asyncio.sleep(BROADCAST_DEBOUNCE)
+        
         async with self._lock:
             self._pending = False
-        await manager.broadcast(await state_cache.get())
-    async def immediate(self):
+        
+        message = await state_cache.get_state_bytes()
+        await manager.broadcast(message)
+        self._last_broadcast = asyncio.get_event_loop().time()
+    
+    async def broadcast_immediate(self):
         state_cache.invalidate()
-        await manager.broadcast(await state_cache.get())
+        message = await state_cache.get_state_bytes()
+        await manager.broadcast(message)
+        self._last_broadcast = asyncio.get_event_loop().time()
 
-debouncer = Debouncer()
+
+debouncer = BroadcastDebouncer()
+
+
+TREASURY_WS_URL = "wss://ws-ap1.pusher.com/app/52e99bd2c3c42e577e13?protocol=7&client=js&version=7.0.3&flash=false"
+TREASURY_CHANNEL = "gold-rate"
+TREASURY_EVENT = "gold-rate-event"
+
 
 def parse_number(value) -> int:
     if isinstance(value, str):
         return int(value.replace(".", "").replace(",", ""))
     return int(float(value))
 
-async def process_treasury(data: dict):
+
+async def process_treasury_data(data: dict):
     global last_buy, shown_updates
+    
     try:
-        buy, sell, upd = data.get("buying_rate"), data.get("selling_rate"), data.get("created_at")
+        buy = data.get("buying_rate")
+        sell = data.get("selling_rate")
+        upd = data.get("created_at")
+        
         if buy and sell and upd and upd not in shown_updates:
-            buy, sell = parse_number(buy), parse_number(sell)
+            buy = parse_number(buy)
+            sell = parse_number(sell)
+            
             diff = 0 if last_buy is None else buy - last_buy
-            status = "➖" if last_buy is None else ("🚀" if buy > last_buy else ("🔻" if buy < last_buy else "➖"))
-            history.append({"buying_rate": buy, "selling_rate": sell, "status": status, "diff": diff, "created_at": upd})
+            if last_buy is None:
+                status = "➖"
+            elif buy > last_buy:
+                status = "🚀"
+            elif buy < last_buy:
+                status = "🔻"
+            else:
+                status = "➖"
+            
+            history.append({
+                "buying_rate": buy,
+                "selling_rate": sell,
+                "status": status,
+                "diff": diff,
+                "created_at": upd
+            })
+            
             last_buy = buy
             shown_updates.add(upd)
+            
             if len(shown_updates) > 5000:
                 shown_updates = {upd}
-            await debouncer.immediate()
+            
+            await debouncer.broadcast_immediate()
+            
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error processing treasury data: {e}")
 
-async def treasury_loop():
+
+async def treasury_ws_loop():
     global treasury_ws, treasury_ws_connected
-    errors = 0
+    
+    consecutive_errors = 0
+    
     while True:
         try:
-            session = await get_session()
-            async with session.ws_connect("wss://ws-ap1.pusher.com/app/52e99bd2c3c42e577e13?protocol=7&client=js&version=7.0.3", heartbeat=20, receive_timeout=45) as ws:
-                treasury_ws, treasury_ws_connected, errors = ws, True, 0
-                await ws.send_str(json_dumps({"event": "pusher:subscribe", "data": {"channel": "gold-rate"}}))
+            session = await get_aiohttp_session()
+            
+            async with session.ws_connect(
+                TREASURY_WS_URL,
+                heartbeat=20,
+                receive_timeout=45
+            ) as ws:
+                treasury_ws = ws
+                treasury_ws_connected = True
+                consecutive_errors = 0
+                print("Treasury WebSocket connected")
+                
+                subscribe_msg = {
+                    "event": "pusher:subscribe",
+                    "data": {
+                        "channel": TREASURY_CHANNEL
+                    }
+                }
+                await ws.send_str(json_dumps(subscribe_msg))
+                print(f"Subscribed to channel: {TREASURY_CHANNEL}")
+                
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
-                        m = json_loads(msg.data)
-                        if m.get("event") == "gold-rate-event":
-                            d = m.get("data", "{}")
-                            await process_treasury(json_loads(d) if isinstance(d, str) else d)
-                    elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                        try:
+                            message = json_loads(msg.data)
+                            event = message.get("event", "")
+                            
+                            if event == TREASURY_EVENT:
+                                data_str = message.get("data", "{}")
+                                if isinstance(data_str, str):
+                                    data = json_loads(data_str)
+                                else:
+                                    data = data_str
+                                await process_treasury_data(data)
+                            
+                            elif event == "pusher:connection_established":
+                                print("Pusher connection established")
+                            
+                            elif event == "pusher_internal:subscription_succeeded":
+                                print(f"Subscription succeeded for channel: {message.get('channel')}")
+                            
+                            elif event == "pusher:error":
+                                print(f"Pusher error: {message.get('data')}")
+                        
+                        except Exception as e:
+                            print(f"Error parsing message: {e}")
+                    
+                    elif msg.type == aiohttp.WSMsgType.CLOSED:
+                        print("Treasury WebSocket closed by server")
                         break
+                    
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        print(f"Treasury WebSocket error: {ws.exception()}")
+                        break
+        
         except asyncio.CancelledError:
+            print("Treasury WebSocket loop cancelled")
             break
+        
         except Exception as e:
-            errors += 1
-            print(f"Treasury error: {e}")
+            consecutive_errors += 1
+            print(f"Treasury WebSocket error (attempt {consecutive_errors}): {e}")
+        
         finally:
             treasury_ws_connected = False
-        await asyncio.sleep(min(errors, 15))
+            treasury_ws = None
+        
+        wait_time = min(1 * consecutive_errors, 15)
+        print(f"Reconnecting Treasury WebSocket in {wait_time} seconds...")
+        await asyncio.sleep(wait_time)
 
-async def usd_loop():
+
+async def usd_idr_loop():
     while True:
         try:
-            price = await fetch_usd_idr()
-            if price and (not usd_idr_history or usd_idr_history[-1]["price"] != price):
-                usd_idr_history.append({"price": price, "time": (datetime.utcnow() + timedelta(hours=7)).strftime("%H:%M:%S")})
-                asyncio.create_task(debouncer.schedule())
+            price = await fetch_usd_idr_price()
+            if price:
+                should_update = (
+                    not usd_idr_history or 
+                    usd_idr_history[-1]["price"] != price
+                )
+                if should_update:
+                    wib = datetime.utcnow() + timedelta(hours=7)
+                    usd_idr_history.append({
+                        "price": price, 
+                        "time": wib.strftime("%H:%M:%S")
+                    })
+                    asyncio.create_task(debouncer.schedule_broadcast())
             await asyncio.sleep(USD_POLL_INTERVAL)
         except asyncio.CancelledError:
             break
         except:
-            await asyncio.sleep(1)
+            await asyncio.sleep(1.0)
+
 
 async def heartbeat_loop():
+    ping_msg = b'{"ping":true}'
     while True:
         try:
-            await asyncio.sleep(15)
+            await asyncio.sleep(15.0)
             if manager.count > 0:
-                await manager.broadcast(b'{"ping":true}')
+                await manager.broadcast(ping_msg)
         except asyncio.CancelledError:
             break
         except:
             pass
 
 
-HTML_TEMPLATE = r'''<!DOCTYPE html>
+HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -433,6 +682,7 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .card{border:1px solid #ccc;border-radius:6px;padding:10px}
 .card-usd{width:248px;height:370px;overflow-y:auto}
 .card-chart{flex:1;min-width:400px;height:370px;overflow:hidden}
+.card-calendar{width:100%;max-width:750px;height:460px;overflow:hidden;display:flex;flex-direction:column}
 #priceList{list-style:none;padding:0;margin:0;max-height:275px;overflow-y:auto}
 #priceList li{margin-bottom:1px}
 .time{color:gray;font-size:.9em;margin-left:10px}
@@ -464,32 +714,30 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .profit-btn.active{background:#ffb300;color:#222;border-color:#ffb300}
 .filter-wrap{display:flex;align-items:center}
 .tradingview-wrapper{height:100%;width:100%;overflow:hidden}
-.calendar-section{width:100%;margin-top:20px;margin-bottom:60px}
-.calendar-section>h3{margin:0 0 10px}
-.calendar-calc-wrap{display:flex;gap:15px;flex-wrap:wrap}
-.card-calendar{flex:1;min-width:450px;height:420px;overflow:hidden}
-.calendar-wrap{width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch}
-.calendar-iframe{border:0;width:100%;height:100%;min-width:700px;display:block}
-.calc-col{display:flex;flex-direction:column;gap:10px;width:300px}
+.calendar-calc-container{display:flex;gap:20px;flex-wrap:wrap;margin-top:20px;margin-bottom:60px}
+.calendar-section{flex:1;min-width:500px}
+.calendar-section h3{margin:0 0 10px}
+.calendar-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.calendar-iframe{border:0;width:100%;height:420px;min-width:700px;display:block}
+.calc-section{width:280px;display:flex;flex-direction:column;gap:10px}
+.calc-section h3{margin:0 0 10px;font-size:1.1em}
 .card-calc{padding:12px}
-.calc-title{font-size:1.05em;font-weight:bold;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #28a745;display:flex;align-items:center;gap:8px;color:#28a745}
-.calc-title.sell-title{border-color:#dc3545;color:#dc3545}
-.dark-mode .calc-title{color:#4caf50}
-.dark-mode .calc-title.sell-title{color:#f44336}
-.calc-icon{font-size:1.15em}
-.calc-rate{font-size:0.82em;color:#666;margin-bottom:10px;padding:6px 10px;background:#f5f5f5;border-radius:4px}
-.dark-mode .calc-rate{background:#2a2a2a;color:#aaa}
-.calc-row{margin-bottom:10px}
-.calc-label{font-size:0.82em;color:#555;margin-bottom:4px;font-weight:500}
-.dark-mode .calc-label{color:#bbb}
-.calc-input{width:100%;padding:9px 11px;border:2px solid #ddd;border-radius:6px;font-size:0.95em;transition:border-color .2s,box-shadow .2s}
-.calc-input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 3px rgba(0,123,255,0.15)}
-.calc-input.buy-input:focus{border-color:#28a745;box-shadow:0 0 0 3px rgba(40,167,69,0.15)}
-.calc-input.sell-input:focus{border-color:#dc3545;box-shadow:0 0 0 3px rgba(220,53,69,0.15)}
-.dark-mode .calc-input{background:#2a2a2a;border-color:#444;color:#e0e0e0}
-.dark-mode .calc-input:focus{border-color:#29b6f6}
-.calc-note{font-size:0.72em;color:#888;margin-top:6px;font-style:italic}
-.dark-mode .calc-note{color:#666}
+.card-calc h4{margin:0 0 8px;font-size:1em;display:flex;align-items:center;gap:6px}
+.calc-rate{font-size:0.85em;color:#666;margin:0 0 10px;padding:6px 8px;background:#f5f5f5;border-radius:4px}
+.calc-rate span{font-weight:bold;color:#ff1744}
+.dark-mode .calc-rate{background:#2a2e32;color:#aaa}
+.dark-mode .calc-rate span{color:#00E124}
+.calc-input-group{margin-bottom:10px}
+.calc-input-group:last-child{margin-bottom:0}
+.calc-input-group label{display:block;font-size:0.8em;margin-bottom:4px;color:#555;font-weight:500}
+.dark-mode .calc-input-group label{color:#aaa}
+.calc-input-group input{width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:1em;transition:border-color .2s,box-shadow .2s}
+.calc-input-group input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 2px rgba(0,123,255,0.15)}
+.dark-mode .calc-input-group input{background:#2a2e32;border-color:#444;color:#e0e0e0}
+.dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 2px rgba(255,179,0,0.15)}
+.calc-input-group input::placeholder{color:#999}
+.dark-mode .calc-input-group input::placeholder{color:#666}
+.calc-boxes{display:flex;flex-direction:column;gap:10px}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-top:0;margin-bottom:10px}
 .chart-header h3{margin:0}
 .limit-label{font-size:0.95em;font-weight:bold;color:#ff1744}
@@ -498,16 +746,36 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .limit-label .limit-num{background:#00E124;color:#181a1b}
 .dark-mode .card{border-color:#444}
 .dark-mode .card-calendar{background:#23272b}
-#tabel thead th.waktu,#tabel tbody td.waktu{position:sticky;left:0;z-index:2;background:#fff}
-#tabel thead th.waktu{z-index:3}
-.dark-mode #tabel thead th.waktu{background:#23272b}
-.dark-mode #tabel tbody td.waktu{background:#23272b}
-@keyframes blink-yellow{0%,100%{background-color:#fff}50%{background-color:#ffeb3b}}
-@keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
-#tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
-.dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
-
-/* Tablet Landscape & Small Desktop */
+#tabel thead th.waktu,
+#tabel tbody td.waktu{
+position:sticky;
+left:0;
+z-index:2;
+background:#fff;
+}
+#tabel thead th.waktu{
+z-index:3;
+}
+.dark-mode #tabel thead th.waktu{
+background:#23272b;
+}
+.dark-mode #tabel tbody td.waktu{
+background:#23272b;
+}
+@keyframes blink-yellow{
+0%,100%{background-color:#fff}
+50%{background-color:#ffeb3b}
+}
+@keyframes blink-yellow-dark{
+0%,100%{background-color:#23272b}
+50%{background-color:#ffd600}
+}
+#tabel tbody tr.blink-row td.waktu{
+animation:blink-yellow 0.4s ease-in-out 5;
+}
+.dark-mode #tabel tbody tr.blink-row td.waktu{
+animation:blink-yellow-dark 0.4s ease-in-out 5;
+}
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -521,6 +789,13 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .container-flex{flex-direction:row;gap:15px}
 .card-usd{width:220px;height:350px}
 .card-chart{flex:1;min-width:350px;height:350px}
+.card-calendar{max-width:100%;height:auto}
+.calendar-iframe{height:400px;min-width:680px}
+.calendar-calc-container{flex-direction:column;gap:15px}
+.calendar-section{min-width:0;width:100%}
+.calc-section{width:100%;flex-direction:row}
+.calc-boxes{flex-direction:row;gap:15px}
+.card-calc{flex:1}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:8px;margin-bottom:8px;padding:6px 0}
 .dataTables_wrapper .dataTables_length{font-size:14px!important}
 .dataTables_wrapper .dataTables_filter{font-size:14px!important}
@@ -530,25 +805,36 @@ h3{font-size:1.05em;margin:15px 0 8px}
 #tabel{min-width:1000px!important;table-layout:fixed!important}
 #tabel thead th{font-size:15px!important;padding:10px 6px!important;font-weight:bold!important}
 #tabel tbody td{font-size:14px!important;padding:9px 5px!important}
-#tabel thead th.waktu,#tabel tbody td.waktu{width:80px!important;min-width:75px!important;max-width:85px!important;padding-left:3px!important;padding-right:3px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:250px!important;min-width:245px!important;max-width:255px!important;padding:8px 10px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:135px!important;padding-left:6px!important;padding-right:6px!important}
+#tabel thead th.waktu,
+#tabel tbody td.waktu{
+width:80px!important;
+min-width:75px!important;
+max-width:85px!important;
+padding-left:3px!important;
+padding-right:3px!important;
+}
+#tabel thead th.transaksi,
+#tabel tbody td.transaksi{
+width:250px!important;
+min-width:245px!important;
+max-width:255px!important;
+padding:8px 10px!important;
+}
+#tabel thead th.profit,
+#tabel tbody td.profit{
+width:130px!important;
+min-width:125px!important;
+max-width:135px!important;
+padding-left:6px!important;
+padding-right:6px!important;
+}
 .profit-order-btns{display:flex}
 .profit-btn{padding:6px 12px;font-size:13px}
 .chart-header{flex-direction:row;gap:10px}
 .chart-header h3{font-size:1em}
 .limit-label{font-size:0.9em}
 .limit-label .limit-num{font-size:1.05em;padding:2px 7px}
-.calendar-section{margin-top:15px;margin-bottom:55px}
-.calendar-calc-wrap{flex-direction:row;flex-wrap:wrap}
-.card-calendar{flex:1;min-width:100%;height:400px;order:1}
-.calendar-wrap{overflow:hidden}
-.calendar-iframe{transform:scale(1.15);transform-origin:0 0;width:87%;height:87%;min-width:600px}
-.calc-col{width:100%;flex-direction:row;gap:12px;order:2}
-.card-calc{flex:1}
 }
-
-/* Tablet Portrait */
 @media(min-width:576px) and (max-width:767px){
 body{padding:12px;padding-bottom:50px}
 h2{font-size:1.05em}
@@ -563,6 +849,14 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
 .card-usd{height:auto;min-height:300px}
 .card-chart{height:360px}
+.card-calendar{max-width:100%;height:auto;padding:0}
+.calendar-calc-container{flex-direction:column;gap:15px}
+.calendar-section{min-width:0;width:100%}
+.calc-section{width:100%;flex-direction:row}
+.calc-boxes{flex-direction:row;gap:12px}
+.card-calc{flex:1;padding:10px}
+.calendar-wrap{margin:0 -12px;padding:0 12px;width:calc(100% + 24px)}
+.calendar-iframe{height:380px;min-width:620px}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:5px;margin-bottom:8px;padding:5px 0}
 .dataTables_wrapper .dataTables_length{font-size:13px!important}
 .dataTables_wrapper .dataTables_filter{font-size:13px!important}
@@ -572,24 +866,33 @@ h3{font-size:0.95em;margin:12px 0 8px}
 #tabel{min-width:950px!important;table-layout:fixed!important}
 #tabel thead th{font-size:14px!important;padding:9px 5px!important;font-weight:bold!important}
 #tabel tbody td{font-size:13px!important;padding:8px 4px!important}
-#tabel thead th.waktu,#tabel tbody td.waktu{width:75px!important;min-width:70px!important;max-width:80px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:235px!important;min-width:230px!important;max-width:240px!important;padding:7px 8px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:125px!important;min-width:120px!important;max-width:130px!important;padding-left:5px!important;padding-right:5px!important}
+#tabel thead th.waktu,
+#tabel tbody td.waktu{
+width:75px!important;
+min-width:70px!important;
+max-width:80px!important;
+}
+#tabel thead th.transaksi,
+#tabel tbody td.transaksi{
+width:235px!important;
+min-width:230px!important;
+max-width:240px!important;
+padding:7px 8px!important;
+}
+#tabel thead th.profit,
+#tabel tbody td.profit{
+width:125px!important;
+min-width:120px!important;
+max-width:130px!important;
+padding-left:5px!important;
+padding-right:5px!important;
+}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 10px;font-size:12px}
 .chart-header{flex-direction:row;gap:8px}
 .chart-header h3{font-size:0.95em}
 .limit-label{font-size:0.85em}
-.calendar-section{margin-top:15px;margin-bottom:55px}
-.calendar-calc-wrap{flex-direction:column;gap:12px}
-.card-calendar{width:100%;min-width:0;height:380px}
-.calendar-wrap{overflow:hidden}
-.calendar-iframe{transform:scale(1.25);transform-origin:0 0;width:80%;height:80%;min-width:450px}
-.calc-col{width:100%;flex-direction:row;gap:10px}
-.card-calc{flex:1}
 }
-
-/* Large Mobile 480-575px */
 @media(min-width:480px) and (max-width:575px){
 body{padding:10px;padding-bottom:48px}
 h2{font-size:1em}
@@ -606,6 +909,20 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .card-usd{height:auto;min-height:280px}
 .card-chart{height:340px}
 .card{padding:8px}
+.card-calendar{height:auto;padding:0}
+.calendar-calc-container{flex-direction:column;gap:12px}
+.calendar-section{min-width:0;width:100%}
+.calc-section{width:100%}
+.calc-boxes{flex-direction:row;gap:10px}
+.card-calc{flex:1;padding:8px}
+.card-calc h4{font-size:0.9em}
+.calc-rate{font-size:0.8em;padding:5px 6px}
+.calc-input-group label{font-size:0.75em}
+.calc-input-group input{padding:8px;font-size:0.9em}
+.calendar-wrap{margin:0 -10px;padding:0 10px;width:calc(100% + 20px)}
+.calendar-iframe{height:360px;min-width:580px}
+#footerApp{padding:6px 0}
+.marquee-text{font-size:12px}
 .dt-top-controls{gap:4px;margin-bottom:6px}
 .dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:12px!important}
 .dataTables_wrapper .dataTables_filter input{width:75px!important;font-size:12px!important}
@@ -615,32 +932,33 @@ h3{font-size:0.92em;margin:12px 0 6px}
 #tabel{min-width:900px!important;table-layout:fixed!important}
 #tabel thead th{font-size:13px!important;padding:8px 4px!important;font-weight:bold!important}
 #tabel tbody td{font-size:12px!important;padding:7px 3px!important}
-#tabel thead th.waktu,#tabel tbody td.waktu{width:72px!important;min-width:68px!important;max-width:76px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:220px!important;min-width:215px!important;max-width:225px!important;padding:6px 6px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:118px!important;min-width:113px!important;max-width:123px!important;padding-left:4px!important;padding-right:4px!important}
+#tabel thead th.waktu,
+#tabel tbody td.waktu{
+width:72px!important;
+min-width:68px!important;
+max-width:76px!important;
+}
+#tabel thead th.transaksi,
+#tabel tbody td.transaksi{
+width:220px!important;
+min-width:215px!important;
+max-width:225px!important;
+padding:6px 6px!important;
+}
+#tabel thead th.profit,
+#tabel tbody td.profit{
+width:118px!important;
+min-width:113px!important;
+max-width:123px!important;
+padding-left:4px!important;
+padding-right:4px!important;
+}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 9px;font-size:11px}
 .chart-header h3{font-size:0.9em}
 .limit-label{font-size:0.82em}
 .limit-label .limit-num{font-size:1em;padding:1px 6px}
-#footerApp{padding:6px 0}
-.marquee-text{font-size:12px}
-/* Calendar Large Mobile - DIPERBESAR */
-.calendar-section{margin:15px 0 50px 0}
-.calendar-calc-wrap{flex-direction:column;gap:12px}
-.card-calendar{width:100%;min-width:0;height:480px}
-.calendar-wrap{overflow:hidden;width:100%;height:100%}
-.calendar-iframe{transform:scale(1.4);transform-origin:0 0;width:72%;height:72%;min-width:320px}
-.calc-col{width:100%;flex-direction:row;gap:8px}
-.card-calc{flex:1;padding:10px}
-.calc-title{font-size:0.95em}
-.calc-rate{font-size:0.78em}
-.calc-label{font-size:0.78em}
-.calc-input{padding:8px 9px;font-size:0.9em}
-.calc-note{font-size:0.68em}
 }
-
-/* Small Mobile <480px */
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
 h2{font-size:0.95em}
@@ -657,6 +975,21 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .card-usd{height:auto;min-height:260px}
 .card-chart{height:320px}
 .card{padding:6px}
+.card-calendar{height:auto;padding:0}
+.calendar-calc-container{flex-direction:column;gap:10px}
+.calendar-section{min-width:0;width:100%}
+.calc-section{width:100%}
+.calc-boxes{flex-direction:row;gap:8px}
+.card-calc{flex:1;padding:6px}
+.card-calc h4{font-size:0.85em;gap:4px}
+.calc-rate{font-size:0.75em;padding:4px 5px;margin-bottom:8px}
+.calc-input-group{margin-bottom:8px}
+.calc-input-group label{font-size:0.7em}
+.calc-input-group input{padding:7px;font-size:0.85em}
+.calendar-wrap{margin:0 -8px;padding:0 8px;width:calc(100% + 16px)}
+.calendar-iframe{height:340px;min-width:550px}
+#footerApp{padding:5px 0}
+.marquee-text{font-size:11px}
 .dt-top-controls{gap:3px;margin-bottom:5px}
 .dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:11px!important}
 .dataTables_wrapper .dataTables_filter input{width:60px!important;font-size:11px!important}
@@ -666,42 +999,41 @@ h3{font-size:0.88em;margin:10px 0 6px}
 #tabel{min-width:850px!important;table-layout:fixed!important}
 #tabel thead th{font-size:12px!important;padding:7px 3px!important;font-weight:bold!important}
 #tabel tbody td{font-size:11px!important;padding:6px 3px!important}
-#tabel thead th.waktu,#tabel tbody td.waktu{width:68px!important;min-width:64px!important;max-width:72px!important;padding-left:2px!important;padding-right:2px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:210px!important;min-width:205px!important;max-width:215px!important;padding:5px 5px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:110px!important;min-width:105px!important;max-width:115px!important;padding-left:3px!important;padding-right:3px!important}
+#tabel thead th.waktu,
+#tabel tbody td.waktu{
+width:68px!important;
+min-width:64px!important;
+max-width:72px!important;
+padding-left:2px!important;
+padding-right:2px!important;
+}
+#tabel thead th.transaksi,
+#tabel tbody td.transaksi{
+width:210px!important;
+min-width:205px!important;
+max-width:215px!important;
+padding:5px 5px!important;
+}
+#tabel thead th.profit,
+#tabel tbody td.profit{
+width:110px!important;
+min-width:105px!important;
+max-width:115px!important;
+padding-left:3px!important;
+padding-right:3px!important;
+}
 .profit-order-btns{display:flex}
 .profit-btn{padding:4px 7px;font-size:10px}
 .chart-header h3{font-size:0.85em}
 .limit-label{font-size:0.78em}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
-#footerApp{padding:5px 0}
-.marquee-text{font-size:11px}
-/* Calendar Small Mobile - DIPERBESAR MAKSIMAL */
-.calendar-section{margin:12px 0 48px 0}
-.calendar-calc-wrap{flex-direction:column;gap:10px}
-.card-calendar{width:100%;min-width:0;height:520px}
-.calendar-wrap{overflow:hidden;width:100%;height:100%}
-.calendar-iframe{transform:scale(1.6);transform-origin:0 0;width:63%;height:63%;min-width:280px}
-.calc-col{width:100%;flex-direction:column;gap:8px}
-.card-calc{width:100%;padding:10px}
-.calc-title{font-size:0.92em}
-.calc-rate{font-size:0.75em}
-.calc-label{font-size:0.75em}
-.calc-input{padding:8px;font-size:0.88em}
-.calc-note{font-size:0.65em}
-}
-
-/* Extra Small Mobile <380px */
-@media(max-width:379px){
-.card-calendar{height:550px}
-.calendar-iframe{transform:scale(1.7);width:59%;height:59%;min-width:250px}
 }
 </style>
 </head>
 <body>
 <div class="header">
 <div class="title-wrap">
-<h2>Harga Emas Treasury ➺</h2>
+<h2>Harga Emas Treasury  ➺ </h2>
 <a href="https://t.me/+FLtJjyjVV8xlM2E1" target="_blank" class="tele-link" title="Join Telegram"><span class="tele-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg></span><span class="tele-text">Telegram</span></a>
 </div>
 <button class="theme-toggle-btn" id="themeBtn" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
@@ -742,45 +1074,46 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 </div>
 </div>
+<div class="calendar-calc-container">
 <div class="calendar-section">
-<h3>Kalender Ekonomi & Kalkulator Emas</h3>
-<div class="calendar-calc-wrap">
+<h3>Kalender Ekonomi</h3>
 <div class="card card-calendar">
 <div class="calendar-wrap">
 <iframe class="calendar-iframe" src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
 </div>
 </div>
-<div class="calc-col">
+</div>
+<div class="calc-section">
+<h3>🧮 Kalkulator Emas</h3>
+<div class="calc-boxes">
 <div class="card card-calc">
-<div class="calc-title"><span class="calc-icon">💰</span> Kalkulator Tumbas Emas</div>
-<div class="calc-rate">Harga Beli: <strong id="calcBuyRate">-</strong> /gram</div>
-<div class="calc-row">
-<div class="calc-label">Masukkan Rupiah (IDR)</div>
-<input type="text" id="buyRupiah" class="calc-input buy-input" placeholder="Contoh: 88.000.000" inputmode="numeric">
+<h4>💰 Hitung Beli</h4>
+<p class="calc-rate">Harga Beli: <span id="buyRateDisplay">-</span>/gr</p>
+<div class="calc-input-group">
+<label>Masukkan Rupiah:</label>
+<input type="text" id="buyIdr" inputmode="numeric" placeholder="Contoh: 10.000.000">
 </div>
-<div class="calc-row">
-<div class="calc-label">Dapat Emas (gram)</div>
-<input type="text" id="buyGram" class="calc-input buy-input" placeholder="Contoh: 0,8888" inputmode="decimal">
+<div class="calc-input-group">
+<label>Masukkan Gram:</label>
+<input type="text" id="buyGram" inputmode="decimal" placeholder="Contoh: 0.8234">
 </div>
-<p class="calc-note">*Berdasarkan harga beli terakhir Treasury</p>
 </div>
 <div class="card card-calc">
-<div class="calc-title sell-title"><span class="calc-icon">💸</span> Kalkulator JUAL Emas</div>
-<div class="calc-rate">Harga Jual: <strong id="calcSellRate">-</strong> /gram</div>
-<div class="calc-row">
-<div class="calc-label">Masukkan Gram Emas</div>
-<input type="text" id="sellGram" class="calc-input sell-input" placeholder="Contoh: 8,0000" inputmode="decimal">
+<h4>💸 Hitung Jual</h4>
+<p class="calc-rate">Harga Jual: <span id="sellRateDisplay">-</span>/gr</p>
+<div class="calc-input-group">
+<label>Masukkan Rupiah:</label>
+<input type="text" id="sellIdr" inputmode="numeric" placeholder="Contoh: 10.000.000">
 </div>
-<div class="calc-row">
-<div class="calc-label">Dapat Rupiah (IDR)</div>
-<input type="text" id="sellRupiah" class="calc-input sell-input" placeholder="Contoh: 88.000.000" inputmode="numeric">
-</div>
-<p class="calc-note">*Berdasarkan harga jual terakhir Treasury</p>
+<div class="calc-input-group">
+<label>Masukkan Gram:</label>
+<input type="text" id="sellGram" inputmode="decimal" placeholder="Contoh: 0.8234">
 </div>
 </div>
 </div>
 </div>
-<footer id="footerApp"><span class="marquee-text">©2026 ~ahmadkholil~</span></footer>
+</div>
+<footer id="footerApp"><span class="marquee-text">&copy;2026 ~ahmadkholil~</span></footer>
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://s3.tradingview.com/tv.js"></script>
@@ -796,108 +1129,72 @@ var savedPriority=localStorage.getItem('profitPriority');
 var profitPriority=(savedPriority&&['jt10','jt20','jt30','jt40','jt50'].indexOf(savedPriority)!==-1)?savedPriority:'jt10';
 var headerLabels={'jt10':'Est.cuan 10JT ➺ gr','jt20':'Est.cuan 20JT ➺ gr','jt30':'Est.cuan 30JT ➺ gr','jt40':'Est.cuan 40JT ➺ gr','jt50':'Est.cuan 50JT ➺ gr'};
 var blinkTimeout=null;
-var currentBuyRate=0;
-var currentSellRate=0;
-var isUpdatingBuy=false;
-var isUpdatingSell=false;
-function formatRupiah(num){
-if(!num&&num!==0)return'';
-return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-}
-function parseRupiah(str){
+
+var latestBuyRate=0;
+var latestSellRate=0;
+var isCalcUpdating=false;
+
+function parseRupiahInput(str){
 if(!str)return 0;
 return parseInt(str.replace(/\./g,''),10)||0;
 }
-function formatGram(num){
-if(!num&&num!==0)return'';
-return num.toFixed(4).replace('.',',');
+function formatRupiahCalc(n){
+if(isNaN(n)||n===0)return'';
+return Math.round(n).toLocaleString('id-ID').replace(/,/g,'.');
 }
-function parseGram(str){
+function parseGramInput(str){
 if(!str)return 0;
 return parseFloat(str.replace(',','.'))||0;
 }
-function updateCalculatorRates(buyRate,sellRate){
-currentBuyRate=buyRate;
-currentSellRate=sellRate;
-$('#calcBuyRate').text(formatRupiah(buyRate));
-$('#calcSellRate').text(formatRupiah(sellRate));
-var buyRupiahVal=$('#buyRupiah').val();
-var sellGramVal=$('#sellGram').val();
-if(buyRupiahVal){
-var rp=parseRupiah(buyRupiahVal);
-if(rp>0&&currentBuyRate>0){
-isUpdatingBuy=true;
-$('#buyGram').val(formatGram(rp/currentBuyRate));
-isUpdatingBuy=false;
+function formatGramCalc(n){
+if(isNaN(n)||n===0)return'';
+return n.toFixed(4).replace('.',',');
 }
+function updateCalcRates(){
+document.getElementById('buyRateDisplay').textContent=latestBuyRate?formatRupiahCalc(latestBuyRate):'-';
+document.getElementById('sellRateDisplay').textContent=latestSellRate?formatRupiahCalc(latestSellRate):'-';
 }
-if(sellGramVal){
-var gr=parseGram(sellGramVal);
-if(gr>0&&currentSellRate>0){
-isUpdatingSell=true;
-$('#sellRupiah').val(formatRupiah(Math.round(gr*currentSellRate)));
-isUpdatingSell=false;
-}
-}
-}
-$('#buyRupiah').on('input',function(){
-if(isUpdatingBuy)return;
-var val=$(this).val().replace(/[^\d]/g,'');
-var num=parseInt(val,10)||0;
-isUpdatingBuy=true;
-$(this).val(num>0?formatRupiah(num):'');
-if(num>0&&currentBuyRate>0){
-$('#buyGram').val(formatGram(num/currentBuyRate));
-}else{
-$('#buyGram').val('');
-}
-isUpdatingBuy=false;
+function setupCalcListeners(){
+var buyIdr=document.getElementById('buyIdr');
+var buyGram=document.getElementById('buyGram');
+var sellIdr=document.getElementById('sellIdr');
+var sellGram=document.getElementById('sellGram');
+
+buyIdr.addEventListener('input',function(){
+if(isCalcUpdating||!latestBuyRate)return;
+isCalcUpdating=true;
+var val=parseRupiahInput(this.value);
+var gram=val/latestBuyRate;
+buyGram.value=gram>0?formatGramCalc(gram):'';
+isCalcUpdating=false;
 });
-$('#buyGram').on('input',function(){
-if(isUpdatingBuy)return;
-var val=$(this).val().replace(/[^\d,\.]/g,'').replace('.',',');
-var parts=val.split(',');
-if(parts.length>2){val=parts[0]+','+parts.slice(1).join('')}
-if(parts[1]&&parts[1].length>4){val=parts[0]+','+parts[1].substring(0,4)}
-isUpdatingBuy=true;
-$(this).val(val);
-var gram=parseGram(val);
-if(gram>0&&currentBuyRate>0){
-$('#buyRupiah').val(formatRupiah(Math.round(gram*currentBuyRate)));
-}else{
-$('#buyRupiah').val('');
-}
-isUpdatingBuy=false;
+buyGram.addEventListener('input',function(){
+if(isCalcUpdating||!latestBuyRate)return;
+isCalcUpdating=true;
+var gram=parseGramInput(this.value);
+var idr=gram*latestBuyRate;
+buyIdr.value=idr>0?formatRupiahCalc(idr):'';
+isCalcUpdating=false;
 });
-$('#sellGram').on('input',function(){
-if(isUpdatingSell)return;
-var val=$(this).val().replace(/[^\d,\.]/g,'').replace('.',',');
-var parts=val.split(',');
-if(parts.length>2){val=parts[0]+','+parts.slice(1).join('')}
-if(parts[1]&&parts[1].length>4){val=parts[0]+','+parts[1].substring(0,4)}
-isUpdatingSell=true;
-$(this).val(val);
-var gram=parseGram(val);
-if(gram>0&&currentSellRate>0){
-$('#sellRupiah').val(formatRupiah(Math.round(gram*currentSellRate)));
-}else{
-$('#sellRupiah').val('');
-}
-isUpdatingSell=false;
+sellIdr.addEventListener('input',function(){
+if(isCalcUpdating||!latestSellRate)return;
+isCalcUpdating=true;
+var val=parseRupiahInput(this.value);
+var gram=val/latestSellRate;
+sellGram.value=gram>0?formatGramCalc(gram):'';
+isCalcUpdating=false;
 });
-$('#sellRupiah').on('input',function(){
-if(isUpdatingSell)return;
-var val=$(this).val().replace(/[^\d]/g,'');
-var num=parseInt(val,10)||0;
-isUpdatingSell=true;
-$(this).val(num>0?formatRupiah(num):'');
-if(num>0&&currentSellRate>0){
-$('#sellGram').val(formatGram(num/currentSellRate));
-}else{
-$('#sellGram').val('');
-}
-isUpdatingSell=false;
+sellGram.addEventListener('input',function(){
+if(isCalcUpdating||!latestSellRate)return;
+isCalcUpdating=true;
+var gram=parseGramInput(this.value);
+var idr=gram*latestSellRate;
+sellIdr.value=idr>0?formatRupiahCalc(idr):'';
+isCalcUpdating=false;
 });
+}
+setupCalcListeners();
+
 function getOrderedProfitKeys(){
 var all=['jt10','jt20','jt30','jt40','jt50'];
 var result=[profitPriority];
@@ -953,7 +1250,7 @@ updateTableHeaders();
 function getTopRowId(h){
 if(!h||!h.length)return'';
 var sorted=h.slice().sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
-return sorted[0].created_at+'|'+sorted[0].buying_rate_raw;
+return sorted[0].created_at+'|'+sorted[0].buying_rate;
 }
 function triggerBlinkEffect(){
 if(blinkTimeout){clearTimeout(blinkTimeout)}
@@ -974,12 +1271,6 @@ var newTopRowId=getTopRowId(h);
 var isNewData=newTopRowId!==lastTopRowId;
 if(isNewData){lastTopRowId=newTopRowId}
 h.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
-if(h.length>0){
-var latest=h[0];
-if(latest.buying_rate_raw&&latest.selling_rate_raw){
-updateCalculatorRates(latest.buying_rate_raw,latest.selling_rate_raw);
-}
-}
 var keys=getOrderedProfitKeys();
 updateTableHeaders();
 var arr=h.map(function(d){
@@ -1003,6 +1294,12 @@ if(isFirstRender){isFirstRender=false}
 function updateTable(h){
 if(!h||!h.length)return;
 latestHistory=h;
+h.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
+if(h.length>0&&h[0].buying_rate_raw&&h[0].selling_rate_raw){
+latestBuyRate=h[0].buying_rate_raw;
+latestSellRate=h[0].selling_rate_raw;
+updateCalcRates();
+}
 renderTable();
 }
 function updateUsd(h){
@@ -1074,6 +1371,7 @@ function updateJam(){
 var n=new Date();
 var days=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 var hari=days[n.getDay()];
+var tgl=n.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
 var jam=n.toLocaleTimeString('id-ID',{hour12:false});
 document.getElementById("jam").textContent=hari+", "+jam+" WIB";
 }
@@ -1096,87 +1394,149 @@ setTimeout(createTradingViewWidget,100);
 })();
 </script>
 </body>
-</html>'''
+</html>"""
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [asyncio.create_task(treasury_loop()), asyncio.create_task(usd_loop()), asyncio.create_task(heartbeat_loop())]
+    tasks = [
+        asyncio.create_task(treasury_ws_loop()),
+        asyncio.create_task(usd_idr_loop()),
+        asyncio.create_task(heartbeat_loop())
+    ]
     yield
     for t in tasks:
         t.cancel()
-    await close_session()
+    await close_aiohttp_session()
     await asyncio.gather(*tasks, return_exceptions=True)
 
-app = FastAPI(lifespan=lifespan)
+
+app = FastAPI(title="Gold Monitor", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
+
 @app.middleware("http")
-async def security(request: Request, call_next):
-    ip = get_client_ip(request)
+async def security_middleware(request: Request, call_next):
+    client_ip = get_client_ip(request)
     path = request.url.path
-    if is_ip_blocked(ip):
-        return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
+    path_lower = path.lower()
+    
+    if is_ip_blocked(client_ip):
+        return Response(
+            content=HTML_RATE_LIMITED,
+            status_code=429,
+            media_type="text/html"
+        )
+    
     if path not in RATE_LIMIT_WHITELIST:
-        ok, _, status = rate_limiter.check(ip)
+        allowed, count, status = rate_limiter.check_rate_limit(client_ip)
+        
         if status == "blocked":
-            block_ip(ip, 600)
-            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
-        if not ok:
-            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html", headers={"Retry-After": "60"})
-    if is_suspicious(path):
-        record_failed(ip, 3)
+            block_ip(client_ip, 600)
+            return Response(
+                content=HTML_RATE_LIMITED,
+                status_code=429,
+                media_type="text/html"
+            )
+        
+        if not allowed:
+            return Response(
+                content=HTML_RATE_LIMITED,
+                status_code=429,
+                media_type="text/html",
+                headers={"Retry-After": "60"}
+            )
+    
+    if is_suspicious_path(path_lower):
+        record_failed_attempt(client_ip, weight=3)
         return Response(content='{"error":"forbidden"}', status_code=403, media_type="application/json")
+    
+    if path_lower.startswith("/aturts") and path_lower != "/aturts" and not path_lower.startswith("/aturts/"):
+        record_failed_attempt(client_ip, weight=2)
+        return Response(content='{"error":"invalid"}', status_code=400, media_type="application/json")
+    
     return await call_next(request)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return HTMLResponse(content=HTML_TEMPLATE)
 
+
 @app.get("/api/state")
-async def api_state():
-    return Response(content=await state_cache.get(), media_type="application/json")
+async def get_state():
+    return Response(
+        content=await state_cache.get_state_bytes(),
+        media_type="application/json"
+    )
+
+
+@app.get("/aturTS")
+@app.get("/aturTS/")
+async def atur_ts_no_value(request: Request):
+    client_ip = get_client_ip(request)
+    if is_ip_blocked(client_ip):
+        raise HTTPException(status_code=429, detail="IP diblokir sementara")
+    record_failed_attempt(client_ip)
+    raise HTTPException(status_code=400, detail="Parameter tidak lengkap")
+
 
 @app.get("/aturTS/{value}")
-async def set_limit(request: Request, value: str = Path(...), key: str = Query(None)):
+async def set_limit_ts(
+    request: Request,
+    value: str = Path(...),
+    key: str = Query(None, description="Secret key")
+):
     global limit_bulan, last_successful_call
-    ip = get_client_ip(request)
-    if is_ip_blocked(ip):
-        raise HTTPException(429, "Blocked")
-    if not key:
-        record_failed(ip, 2)
-        raise HTTPException(400, "Key required")
+    
+    client_ip = get_client_ip(request)
+    
+    if is_ip_blocked(client_ip):
+        raise HTTPException(status_code=429, detail="IP diblokir sementara")
+    
+    if key is None:
+        record_failed_attempt(client_ip, weight=2)
+        raise HTTPException(status_code=400, detail="Parameter key diperlukan")
+    
     if not verify_secret(key):
-        record_failed(ip)
-        raise HTTPException(403, "Forbidden")
+        record_failed_attempt(client_ip)
+        raise HTTPException(status_code=403, detail="Akses ditolak")
+    
     try:
-        v = int(value)
-    except:
-        record_failed(ip)
-        raise HTTPException(400, "Invalid")
+        int_value = int(value)
+    except (ValueError, TypeError):
+        record_failed_attempt(client_ip)
+        raise HTTPException(status_code=400, detail="Nilai harus berupa angka")
+    
     now = time.time()
     if now - last_successful_call < RATE_LIMIT_SECONDS:
-        raise HTTPException(429, "Too fast")
-    if not MIN_LIMIT <= v <= MAX_LIMIT:
-        raise HTTPException(400, f"Range {MIN_LIMIT}-{MAX_LIMIT}")
-    limit_bulan = v
+        raise HTTPException(status_code=429, detail="Terlalu cepat, tunggu beberapa detik")
+    
+    if not MIN_LIMIT <= int_value <= MAX_LIMIT:
+        raise HTTPException(status_code=400, detail=f"Nilai harus {MIN_LIMIT}-{MAX_LIMIT}")
+    
+    limit_bulan = int_value
     last_successful_call = now
     state_cache.invalidate()
-    asyncio.create_task(debouncer.schedule())
+    asyncio.create_task(debouncer.schedule_broadcast())
+    
     return {"status": "ok", "limit_bulan": limit_bulan}
 
+
 @app.websocket("/ws")
-async def ws_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     if not await manager.connect(ws):
-        await ws.close(1013, "Too many")
+        await ws.close(code=1013, reason="Too many connections")
         return
     try:
-        await ws.send_bytes(await state_cache.get())
+        initial_data = await state_cache.get_state_bytes()
+        await ws.send_bytes(initial_data)
         while True:
             try:
-                data = await asyncio.wait_for(ws.receive(), timeout=45)
-                if data.get("type") == "websocket.disconnect":
+                data = await asyncio.wait_for(ws.receive(), timeout=45.0)
+                msg_type = data.get("type")
+                if msg_type == "websocket.disconnect":
                     break
                 if data.get("text") == "ping" or data.get("bytes") == b"ping":
                     await ws.send_bytes(b'{"pong":true}')
@@ -1185,7 +1545,9 @@ async def ws_endpoint(ws: WebSocket):
                     await ws.send_bytes(b'{"ping":true}')
                 except:
                     break
-    except:
+    except WebSocketDisconnect:
+        pass
+    except Exception:
         pass
     finally:
         manager.disconnect(ws)
@@ -1194,13 +1556,17 @@ async def ws_endpoint(ws: WebSocket):
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def catch_all(request: Request, path: str):
     client_ip = get_client_ip(request)
+    
     if is_ip_blocked(client_ip):
         raise HTTPException(status_code=429, detail="IP diblokir sementara")
+    
     path_lower = path.lower()
+    
     if "atur" in path_lower or "admin" in path_lower or "config" in path_lower:
-        record_failed(client_ip, weight=2)
+        record_failed_attempt(client_ip, weight=2)
         raise HTTPException(status_code=403, detail="Akses ditolak")
-    record_failed(client_ip)
+    
+    record_failed_attempt(client_ip)
     raise HTTPException(status_code=404, detail="Halaman tidak ditemukan")
 
 if __name__ == "__main__":
