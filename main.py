@@ -682,7 +682,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .card{border:1px solid #ccc;border-radius:6px;padding:10px}
 .card-usd{width:248px;height:370px;overflow-y:auto}
 .card-chart{flex:1;min-width:400px;height:370px;overflow:hidden}
-.card-calendar{width:100%;max-width:750px;height:460px;overflow:hidden;display:flex;flex-direction:column}
 #priceList{list-style:none;padding:0;margin:0;max-height:275px;overflow-y:auto}
 #priceList li{margin-bottom:1px}
 .time{color:gray;font-size:.9em;margin-left:10px}
@@ -714,30 +713,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .profit-btn.active{background:#ffb300;color:#222;border-color:#ffb300}
 .filter-wrap{display:flex;align-items:center}
 .tradingview-wrapper{height:100%;width:100%;overflow:hidden}
-.calendar-calc-container{display:flex;gap:20px;flex-wrap:wrap;margin-top:20px;margin-bottom:60px}
-.calendar-section{flex:1;min-width:500px}
-.calendar-section h3{margin:0 0 10px}
-.calendar-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.calendar-iframe{border:0;width:100%;height:420px;min-width:700px;display:block}
-.calc-section{width:280px;display:flex;flex-direction:column;gap:10px}
-.calc-section h3{margin:0 0 10px;font-size:1.1em}
-.card-calc{padding:12px}
-.card-calc h4{margin:0 0 8px;font-size:1em;display:flex;align-items:center;gap:6px}
-.calc-rate{font-size:0.85em;color:#666;margin:0 0 10px;padding:6px 8px;background:#f5f5f5;border-radius:4px}
-.calc-rate span{font-weight:bold;color:#ff1744}
-.dark-mode .calc-rate{background:#2a2e32;color:#aaa}
-.dark-mode .calc-rate span{color:#00E124}
-.calc-input-group{margin-bottom:10px}
-.calc-input-group:last-child{margin-bottom:0}
-.calc-input-group label{display:block;font-size:0.8em;margin-bottom:4px;color:#555;font-weight:500}
-.dark-mode .calc-input-group label{color:#aaa}
-.calc-input-group input{width:100%;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:1em;transition:border-color .2s,box-shadow .2s}
-.calc-input-group input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 2px rgba(0,123,255,0.15)}
-.dark-mode .calc-input-group input{background:#2a2e32;border-color:#444;color:#e0e0e0}
-.dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 2px rgba(255,179,0,0.15)}
-.calc-input-group input::placeholder{color:#999}
-.dark-mode .calc-input-group input::placeholder{color:#666}
-.calc-boxes{display:flex;flex-direction:column;gap:10px}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-top:0;margin-bottom:10px}
 .chart-header h3{margin:0}
 .limit-label{font-size:0.95em;font-weight:bold;color:#ff1744}
@@ -745,288 +720,113 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .limit-label{color:#00E124}
 .dark-mode .limit-label .limit-num{background:#00E124;color:#181a1b}
 .dark-mode .card{border-color:#444}
-.dark-mode .card-calendar{background:#23272b}
-#tabel thead th.waktu,
-#tabel tbody td.waktu{
-position:sticky;
-left:0;
-z-index:2;
-background:#fff;
+#tabel thead th.waktu,#tabel tbody td.waktu{position:sticky;left:0;z-index:2;background:#fff}
+#tabel thead th.waktu{z-index:3}
+.dark-mode #tabel thead th.waktu{background:#23272b}
+.dark-mode #tabel tbody td.waktu{background:#23272b}
+@keyframes blink-yellow{0%,100%{background-color:#fff}50%{background-color:#ffeb3b}}
+@keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
+#tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
+.dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
+
+.bottom-section{display:flex;gap:20px;margin-top:20px;margin-bottom:60px}
+.calendar-box{flex:1;min-width:0}
+.calendar-box h3{margin:0 0 10px}
+.calendar-card{border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fff}
+.dark-mode .calendar-card{border-color:#444;background:#23272b}
+.calendar-scroll{width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.calendar-scroll::-webkit-scrollbar{height:8px}
+.calendar-scroll::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px}
+.calendar-scroll::-webkit-scrollbar-thumb{background:#888;border-radius:4px}
+.calendar-scroll::-webkit-scrollbar-thumb:hover{background:#555}
+.dark-mode .calendar-scroll::-webkit-scrollbar-track{background:#2a2e32}
+.dark-mode .calendar-scroll::-webkit-scrollbar-thumb{background:#555}
+.calendar-inner{min-width:750px;height:450px}
+.calendar-inner iframe{border:0;width:100%;height:100%;display:block}
+
+.calc-box{width:300px;flex-shrink:0}
+.calc-box h3{margin:0 0 10px;font-size:1.1em}
+.calc-cards{display:flex;flex-direction:column;gap:12px}
+.card-calc{border:1px solid #ccc;border-radius:6px;padding:14px;background:#fff}
+.dark-mode .card-calc{border-color:#444;background:#23272b}
+.card-calc h4{margin:0 0 10px;font-size:1em;display:flex;align-items:center;gap:6px;color:#333}
+.dark-mode .card-calc h4{color:#e0e0e0}
+.calc-rate{font-size:0.9em;color:#666;margin:0 0 12px;padding:8px 10px;background:#f5f5f5;border-radius:4px;font-weight:500}
+.calc-rate span{font-weight:bold;color:#ff1744}
+.dark-mode .calc-rate{background:#2a2e32;color:#aaa}
+.dark-mode .calc-rate span{color:#00E124}
+.calc-input-group{margin-bottom:12px}
+.calc-input-group:last-child{margin-bottom:0}
+.calc-input-group label{display:block;font-size:0.85em;margin-bottom:5px;color:#555;font-weight:500}
+.dark-mode .calc-input-group label{color:#aaa}
+.calc-input-group input{width:100%;padding:12px;border:2px solid #ddd;border-radius:6px;font-size:1em;transition:border-color .2s,box-shadow .2s}
+.calc-input-group input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 3px rgba(0,123,255,0.15)}
+.dark-mode .calc-input-group input{background:#1e2124;border-color:#444;color:#e0e0e0}
+.dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 3px rgba(255,179,0,0.15)}
+.calc-input-group input::placeholder{color:#999}
+.dark-mode .calc-input-group input::placeholder{color:#666}
+
+@media(max-width:1024px){
+.bottom-section{flex-direction:column;gap:20px}
+.calc-box{width:100%}
+.calc-cards{flex-direction:row;gap:15px}
+.calc-cards .card-calc{flex:1}
+.calendar-inner{min-width:700px;height:420px}
 }
-#tabel thead th.waktu{
-z-index:3;
-}
-.dark-mode #tabel thead th.waktu{
-background:#23272b;
-}
-.dark-mode #tabel tbody td.waktu{
-background:#23272b;
-}
-@keyframes blink-yellow{
-0%,100%{background-color:#fff}
-50%{background-color:#ffeb3b}
-}
-@keyframes blink-yellow-dark{
-0%,100%{background-color:#23272b}
-50%{background-color:#ffd600}
-}
-#tabel tbody tr.blink-row td.waktu{
-animation:blink-yellow 0.4s ease-in-out 5;
-}
-.dark-mode #tabel tbody tr.blink-row td.waktu{
-animation:blink-yellow-dark 0.4s ease-in-out 5;
-}
-@media(min-width:768px) and (max-width:1024px){
-body{padding:15px;padding-bottom:50px}
-h2{font-size:1.15em}
-h3{font-size:1.05em;margin:15px 0 8px}
-.header{margin-bottom:4px}
-.tele-icon{width:30px;height:30px}
-.tele-icon svg{width:16px;height:16px}
-.tele-text{font-size:0.9em}
-#jam{font-size:2em;margin-bottom:8px}
-.theme-toggle-btn{width:42px;height:42px;font-size:1.4em}
-.container-flex{flex-direction:row;gap:15px}
-.card-usd{width:220px;height:350px}
-.card-chart{flex:1;min-width:350px;height:350px}
-.card-calendar{max-width:100%;height:auto}
-.calendar-iframe{height:400px;min-width:680px}
-.calendar-calc-container{flex-direction:column;gap:15px}
-.calendar-section{min-width:0;width:100%}
-.calc-section{width:100%;flex-direction:row}
-.calc-boxes{flex-direction:row;gap:15px}
-.card-calc{flex:1}
-.dt-top-controls{flex-direction:row;justify-content:space-between;gap:8px;margin-bottom:8px;padding:6px 0}
-.dataTables_wrapper .dataTables_length{font-size:14px!important}
-.dataTables_wrapper .dataTables_filter{font-size:14px!important}
-.dataTables_wrapper .dataTables_filter input{width:100px!important;font-size:14px!important;padding:5px 8px!important}
-.dataTables_wrapper .dataTables_length select{font-size:14px!important;padding:4px!important}
-.dataTables_wrapper .dataTables_paginate .paginate_button{padding:6px 14px!important;font-size:14px!important}
-#tabel{min-width:1000px!important;table-layout:fixed!important}
-#tabel thead th{font-size:15px!important;padding:10px 6px!important;font-weight:bold!important}
-#tabel tbody td{font-size:14px!important;padding:9px 5px!important}
-#tabel thead th.waktu,
-#tabel tbody td.waktu{
-width:80px!important;
-min-width:75px!important;
-max-width:85px!important;
-padding-left:3px!important;
-padding-right:3px!important;
-}
-#tabel thead th.transaksi,
-#tabel tbody td.transaksi{
-width:250px!important;
-min-width:245px!important;
-max-width:255px!important;
-padding:8px 10px!important;
-}
-#tabel thead th.profit,
-#tabel tbody td.profit{
-width:130px!important;
-min-width:125px!important;
-max-width:135px!important;
-padding-left:6px!important;
-padding-right:6px!important;
-}
-.profit-order-btns{display:flex}
-.profit-btn{padding:6px 12px;font-size:13px}
-.chart-header{flex-direction:row;gap:10px}
-.chart-header h3{font-size:1em}
-.limit-label{font-size:0.9em}
-.limit-label .limit-num{font-size:1.05em;padding:2px 7px}
-}
-@media(min-width:576px) and (max-width:767px){
+@media(max-width:767px){
 body{padding:12px;padding-bottom:50px}
 h2{font-size:1.05em}
-h3{font-size:0.95em;margin:12px 0 8px}
-.header{margin-bottom:2px}
-.tele-icon{width:28px;height:28px}
-.tele-icon svg{width:15px;height:15px}
-.tele-text{font-size:0.85em}
-#jam{font-size:2em;margin-bottom:6px}
-.theme-toggle-btn{width:38px;height:38px;font-size:1.3em}
+#jam{font-size:1.8em;margin-bottom:6px}
 .container-flex{flex-direction:column;gap:15px}
-.card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
-.card-usd{height:auto;min-height:300px}
-.card-chart{height:360px}
-.card-calendar{max-width:100%;height:auto;padding:0}
-.calendar-calc-container{flex-direction:column;gap:15px}
-.calendar-section{min-width:0;width:100%}
-.calc-section{width:100%;flex-direction:row}
-.calc-boxes{flex-direction:row;gap:12px}
-.card-calc{flex:1;padding:10px}
-.calendar-wrap{margin:0 -12px;padding:0 12px;width:calc(100% + 24px)}
-.calendar-iframe{height:380px;min-width:620px}
-.dt-top-controls{flex-direction:row;justify-content:space-between;gap:5px;margin-bottom:8px;padding:5px 0}
-.dataTables_wrapper .dataTables_length{font-size:13px!important}
-.dataTables_wrapper .dataTables_filter{font-size:13px!important}
-.dataTables_wrapper .dataTables_filter input{width:85px!important;font-size:13px!important;padding:4px 6px!important}
-.dataTables_wrapper .dataTables_length select{font-size:13px!important;padding:3px!important}
-.dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 12px!important;font-size:13px!important}
-#tabel{min-width:950px!important;table-layout:fixed!important}
-#tabel thead th{font-size:14px!important;padding:9px 5px!important;font-weight:bold!important}
-#tabel tbody td{font-size:13px!important;padding:8px 4px!important}
-#tabel thead th.waktu,
-#tabel tbody td.waktu{
-width:75px!important;
-min-width:70px!important;
-max-width:80px!important;
-}
-#tabel thead th.transaksi,
-#tabel tbody td.transaksi{
-width:235px!important;
-min-width:230px!important;
-max-width:240px!important;
-padding:7px 8px!important;
-}
-#tabel thead th.profit,
-#tabel tbody td.profit{
-width:125px!important;
-min-width:120px!important;
-max-width:130px!important;
-padding-left:5px!important;
-padding-right:5px!important;
-}
-.profit-order-btns{display:flex}
-.profit-btn{padding:5px 10px;font-size:12px}
-.chart-header{flex-direction:row;gap:8px}
-.chart-header h3{font-size:0.95em}
-.limit-label{font-size:0.85em}
-}
-@media(min-width:480px) and (max-width:575px){
-body{padding:10px;padding-bottom:48px}
-h2{font-size:1em}
-h3{font-size:0.92em;margin:12px 0 6px}
-.header{margin-bottom:2px}
-.title-wrap{gap:6px}
-.tele-icon{width:26px;height:26px}
-.tele-icon svg{width:14px;height:14px}
-.tele-text{font-size:0.8em}
-#jam{font-size:1.15em;margin-bottom:5px}
-.theme-toggle-btn{width:36px;height:36px;font-size:1.2em}
-.container-flex{flex-direction:column;gap:12px}
 .card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
 .card-usd{height:auto;min-height:280px}
 .card-chart{height:340px}
-.card{padding:8px}
-.card-calendar{height:auto;padding:0}
-.calendar-calc-container{flex-direction:column;gap:12px}
-.calendar-section{min-width:0;width:100%}
-.calc-section{width:100%}
-.calc-boxes{flex-direction:row;gap:10px}
-.card-calc{flex:1;padding:8px}
-.card-calc h4{font-size:0.9em}
-.calc-rate{font-size:0.8em;padding:5px 6px}
-.calc-input-group label{font-size:0.75em}
-.calc-input-group input{padding:8px;font-size:0.9em}
-.calendar-wrap{margin:0 -10px;padding:0 10px;width:calc(100% + 20px)}
-.calendar-iframe{height:360px;min-width:580px}
-#footerApp{padding:6px 0}
-.marquee-text{font-size:12px}
-.dt-top-controls{gap:4px;margin-bottom:6px}
-.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:12px!important}
-.dataTables_wrapper .dataTables_filter input{width:75px!important;font-size:12px!important}
-.dataTables_wrapper .dataTables_length select{font-size:12px!important}
-.dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 10px!important;font-size:12px!important}
-#priceList{max-height:220px}
-#tabel{min-width:900px!important;table-layout:fixed!important}
-#tabel thead th{font-size:13px!important;padding:8px 4px!important;font-weight:bold!important}
-#tabel tbody td{font-size:12px!important;padding:7px 3px!important}
-#tabel thead th.waktu,
-#tabel tbody td.waktu{
-width:72px!important;
-min-width:68px!important;
-max-width:76px!important;
-}
-#tabel thead th.transaksi,
-#tabel tbody td.transaksi{
-width:220px!important;
-min-width:215px!important;
-max-width:225px!important;
-padding:6px 6px!important;
-}
-#tabel thead th.profit,
-#tabel tbody td.profit{
-width:118px!important;
-min-width:113px!important;
-max-width:123px!important;
-padding-left:4px!important;
-padding-right:4px!important;
-}
+.bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
+.calc-box{width:100%}
+.calc-cards{flex-direction:row;gap:12px}
+.calc-cards .card-calc{flex:1;padding:12px}
+.calendar-inner{min-width:650px;height:400px}
 .profit-order-btns{display:flex}
-.profit-btn{padding:5px 9px;font-size:11px}
-.chart-header h3{font-size:0.9em}
-.limit-label{font-size:0.82em}
-.limit-label .limit-num{font-size:1em;padding:1px 6px}
+}
+@media(max-width:575px){
+body{padding:10px;padding-bottom:48px}
+h2{font-size:1em}
+#jam{font-size:1.5em;margin-bottom:5px}
+.theme-toggle-btn{width:38px;height:38px;font-size:1.2em}
+.bottom-section{gap:12px;margin-bottom:45px}
+.calc-cards{gap:10px}
+.calc-cards .card-calc{padding:10px}
+.card-calc h4{font-size:0.9em;margin-bottom:8px}
+.calc-rate{font-size:0.8em;padding:6px 8px;margin-bottom:10px}
+.calc-input-group{margin-bottom:10px}
+.calc-input-group label{font-size:0.8em}
+.calc-input-group input{padding:10px;font-size:0.95em}
+.calendar-inner{min-width:600px;height:380px}
+.calendar-box h3,.calc-box h3{font-size:1em}
+.profit-order-btns{display:flex}
+.profit-btn{padding:4px 8px;font-size:11px}
 }
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
-h2{font-size:0.95em}
-h3{font-size:0.88em;margin:10px 0 6px}
-.header{margin-bottom:1px}
-.title-wrap{gap:5px}
-.tele-icon{width:24px;height:24px}
-.tele-icon svg{width:13px;height:13px}
-.tele-text{font-size:0.75em}
+h2{font-size:0.9em}
 #jam{font-size:1.3em;margin-bottom:4px}
 .theme-toggle-btn{width:34px;height:34px;font-size:1.1em}
-.container-flex{flex-direction:column;gap:10px}
-.card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
-.card-usd{height:auto;min-height:260px}
-.card-chart{height:320px}
-.card{padding:6px}
-.card-calendar{height:auto;padding:0}
-.calendar-calc-container{flex-direction:column;gap:10px}
-.calendar-section{min-width:0;width:100%}
-.calc-section{width:100%}
-.calc-boxes{flex-direction:row;gap:8px}
-.card-calc{flex:1;padding:6px}
+.tele-icon{width:26px;height:26px}
+.tele-text{font-size:0.75em}
+.bottom-section{gap:10px;margin-bottom:42px}
+.calc-cards{gap:8px}
+.calc-cards .card-calc{padding:8px}
 .card-calc h4{font-size:0.85em;gap:4px}
-.calc-rate{font-size:0.75em;padding:4px 5px;margin-bottom:8px}
-.calc-input-group{margin-bottom:8px}
-.calc-input-group label{font-size:0.7em}
-.calc-input-group input{padding:7px;font-size:0.85em}
-.calendar-wrap{margin:0 -8px;padding:0 8px;width:calc(100% + 16px)}
-.calendar-iframe{height:340px;min-width:550px}
-#footerApp{padding:5px 0}
-.marquee-text{font-size:11px}
-.dt-top-controls{gap:3px;margin-bottom:5px}
-.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:11px!important}
-.dataTables_wrapper .dataTables_filter input{width:60px!important;font-size:11px!important}
-.dataTables_wrapper .dataTables_length select{font-size:11px!important}
-.dataTables_wrapper .dataTables_paginate .paginate_button{padding:4px 8px!important;font-size:11px!important}
-#priceList{max-height:190px}
-#tabel{min-width:850px!important;table-layout:fixed!important}
-#tabel thead th{font-size:12px!important;padding:7px 3px!important;font-weight:bold!important}
-#tabel tbody td{font-size:11px!important;padding:6px 3px!important}
-#tabel thead th.waktu,
-#tabel tbody td.waktu{
-width:68px!important;
-min-width:64px!important;
-max-width:72px!important;
-padding-left:2px!important;
-padding-right:2px!important;
-}
-#tabel thead th.transaksi,
-#tabel tbody td.transaksi{
-width:210px!important;
-min-width:205px!important;
-max-width:215px!important;
-padding:5px 5px!important;
-}
-#tabel thead th.profit,
-#tabel tbody td.profit{
-width:110px!important;
-min-width:105px!important;
-max-width:115px!important;
-padding-left:3px!important;
-padding-right:3px!important;
-}
+.calc-rate{font-size:0.75em;padding:5px 6px}
+.calc-input-group label{font-size:0.75em}
+.calc-input-group input{padding:8px;font-size:0.9em;border-radius:4px}
+.calendar-inner{min-width:550px;height:360px}
+.calendar-box h3,.calc-box h3{font-size:0.95em}
+#priceList{max-height:180px}
 .profit-order-btns{display:flex}
-.profit-btn{padding:4px 7px;font-size:10px}
-.chart-header h3{font-size:0.85em}
-.limit-label{font-size:0.78em}
-.limit-label .limit-num{font-size:0.95em;padding:1px 5px}
+.profit-btn{padding:3px 6px;font-size:10px}
+#tabel thead th{font-size:12px!important;padding:7px 3px!important}
+#tabel tbody td{font-size:11px!important;padding:6px 3px!important}
 }
 </style>
 </head>
@@ -1074,40 +874,42 @@ padding-right:3px!important;
 </div>
 </div>
 </div>
-<div class="calendar-calc-container">
-<div class="calendar-section">
-<h3>Kalender Ekonomi</h3>
-<div class="card card-calendar">
-<div class="calendar-wrap">
-<iframe class="calendar-iframe" src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
+<div class="bottom-section">
+<div class="calendar-box">
+<h3>📅 Kalender Ekonomi</h3>
+<div class="calendar-card">
+<div class="calendar-scroll">
+<div class="calendar-inner">
+<iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
 </div>
 </div>
 </div>
-<div class="calc-section">
+</div>
+<div class="calc-box">
 <h3>🧮 Kalkulator Emas</h3>
-<div class="calc-boxes">
-<div class="card card-calc">
+<div class="calc-cards">
+<div class="card-calc">
 <h4>💰 Hitung Beli</h4>
-<p class="calc-rate">Harga Beli: <span id="buyRateDisplay">-</span>/gr</p>
+<p class="calc-rate">Harga: <span id="buyRateDisplay">-</span>/gr</p>
 <div class="calc-input-group">
-<label>Masukkan Rupiah:</label>
-<input type="text" id="buyIdr" inputmode="numeric" placeholder="Contoh: 10.000.000">
+<label>Masukkan Rupiah (IDR)</label>
+<input type="text" id="buyIdr" inputmode="numeric" placeholder="Contoh: 88.000.000">
 </div>
 <div class="calc-input-group">
-<label>Masukkan Gram:</label>
-<input type="text" id="buyGram" inputmode="decimal" placeholder="Contoh: 0.8234">
+<label>Hasil Gram</label>
+<input type="text" id="buyGram" inputmode="decimal" placeholder="Contoh: 0.8888">
 </div>
 </div>
-<div class="card card-calc">
+<div class="card-calc">
 <h4>💸 Hitung Jual</h4>
-<p class="calc-rate">Harga Jual: <span id="sellRateDisplay">-</span>/gr</p>
+<p class="calc-rate">Harga: <span id="sellRateDisplay">-</span>/gr</p>
 <div class="calc-input-group">
-<label>Masukkan Rupiah:</label>
-<input type="text" id="sellIdr" inputmode="numeric" placeholder="Contoh: 10.000.000">
+<label>Masukkan Gram</label>
+<input type="text" id="sellGram" inputmode="decimal" placeholder="Contoh: 0.8888">
 </div>
 <div class="calc-input-group">
-<label>Masukkan Gram:</label>
-<input type="text" id="sellGram" inputmode="decimal" placeholder="Contoh: 0.8234">
+<label>Hasil Rupiah (IDR)</label>
+<input type="text" id="sellIdr" inputmode="numeric" placeholder="Contoh: 88.000.000">
 </div>
 </div>
 </div>
@@ -1129,7 +931,6 @@ var savedPriority=localStorage.getItem('profitPriority');
 var profitPriority=(savedPriority&&['jt10','jt20','jt30','jt40','jt50'].indexOf(savedPriority)!==-1)?savedPriority:'jt10';
 var headerLabels={'jt10':'Est.cuan 10JT ➺ gr','jt20':'Est.cuan 20JT ➺ gr','jt30':'Est.cuan 30JT ➺ gr','jt40':'Est.cuan 40JT ➺ gr','jt50':'Est.cuan 50JT ➺ gr'};
 var blinkTimeout=null;
-
 var latestBuyRate=0;
 var latestSellRate=0;
 var isCalcUpdating=false;
@@ -1141,6 +942,11 @@ return parseInt(str.replace(/\./g,''),10)||0;
 function formatRupiahCalc(n){
 if(isNaN(n)||n===0)return'';
 return Math.round(n).toLocaleString('id-ID').replace(/,/g,'.');
+}
+function formatRupiahLive(str){
+var num=str.replace(/\D/g,'');
+if(!num)return'';
+return parseInt(num,10).toLocaleString('id-ID').replace(/,/g,'.');
 }
 function parseGramInput(str){
 if(!str)return 0;
@@ -1160,14 +966,97 @@ var buyGram=document.getElementById('buyGram');
 var sellIdr=document.getElementById('sellIdr');
 var sellGram=document.getElementById('sellGram');
 
+function onlyNumbers(e){
+var key=e.key;
+if(e.ctrlKey||e.metaKey)return;
+if(key==='Backspace'||key==='Delete'||key==='ArrowLeft'||key==='ArrowRight'||key==='Tab')return;
+if(!/^[0-9]$/.test(key)){
+e.preventDefault();
+}
+}
+
+function onlyNumbersAndComma(e){
+var key=e.key;
+var val=this.value;
+if(e.ctrlKey||e.metaKey)return;
+if(key==='Backspace'||key==='Delete'||key==='ArrowLeft'||key==='ArrowRight'||key==='Tab')return;
+if(key===','||key==='.'){
+if(val.indexOf(',')!==-1||val.indexOf('.')!==-1){
+e.preventDefault();
+return;
+}
+return;
+}
+if(!/^[0-9]$/.test(key)){
+e.preventDefault();
+}
+}
+
+buyIdr.addEventListener('keypress',onlyNumbers);
+sellIdr.addEventListener('keypress',onlyNumbers);
+buyGram.addEventListener('keypress',onlyNumbersAndComma);
+sellGram.addEventListener('keypress',onlyNumbersAndComma);
+
+buyIdr.addEventListener('paste',function(e){
+e.preventDefault();
+var text=(e.clipboardData||window.clipboardData).getData('text');
+var nums=text.replace(/\D/g,'');
+if(nums){
+document.execCommand('insertText',false,nums);
+}
+});
+
+sellIdr.addEventListener('paste',function(e){
+e.preventDefault();
+var text=(e.clipboardData||window.clipboardData).getData('text');
+var nums=text.replace(/\D/g,'');
+if(nums){
+document.execCommand('insertText',false,nums);
+}
+});
+
+buyGram.addEventListener('paste',function(e){
+e.preventDefault();
+var text=(e.clipboardData||window.clipboardData).getData('text');
+var clean=text.replace(/[^0-9,.]/g,'').replace(/\./g,',');
+var parts=clean.split(',');
+var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
+if(result){
+document.execCommand('insertText',false,result);
+}
+});
+
+sellGram.addEventListener('paste',function(e){
+e.preventDefault();
+var text=(e.clipboardData||window.clipboardData).getData('text');
+var clean=text.replace(/[^0-9,.]/g,'').replace(/\./g,',');
+var parts=clean.split(',');
+var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
+if(result){
+document.execCommand('insertText',false,result);
+}
+});
+
 buyIdr.addEventListener('input',function(){
-if(isCalcUpdating||!latestBuyRate)return;
+if(isCalcUpdating)return;
 isCalcUpdating=true;
-var val=parseRupiahInput(this.value);
+var cursorPos=this.selectionStart;
+var oldLen=this.value.length;
+var formatted=formatRupiahLive(this.value);
+this.value=formatted;
+var newLen=formatted.length;
+var newPos=cursorPos+(newLen-oldLen);
+if(newPos<0)newPos=0;
+if(newPos>newLen)newPos=newLen;
+this.setSelectionRange(newPos,newPos);
+if(latestBuyRate){
+var val=parseRupiahInput(formatted);
 var gram=val/latestBuyRate;
 buyGram.value=gram>0?formatGramCalc(gram):'';
+}
 isCalcUpdating=false;
 });
+
 buyGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestBuyRate)return;
 isCalcUpdating=true;
@@ -1176,20 +1065,33 @@ var idr=gram*latestBuyRate;
 buyIdr.value=idr>0?formatRupiahCalc(idr):'';
 isCalcUpdating=false;
 });
-sellIdr.addEventListener('input',function(){
-if(isCalcUpdating||!latestSellRate)return;
-isCalcUpdating=true;
-var val=parseRupiahInput(this.value);
-var gram=val/latestSellRate;
-sellGram.value=gram>0?formatGramCalc(gram):'';
-isCalcUpdating=false;
-});
+
 sellGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestSellRate)return;
 isCalcUpdating=true;
 var gram=parseGramInput(this.value);
 var idr=gram*latestSellRate;
 sellIdr.value=idr>0?formatRupiahCalc(idr):'';
+isCalcUpdating=false;
+});
+
+sellIdr.addEventListener('input',function(){
+if(isCalcUpdating)return;
+isCalcUpdating=true;
+var cursorPos=this.selectionStart;
+var oldLen=this.value.length;
+var formatted=formatRupiahLive(this.value);
+this.value=formatted;
+var newLen=formatted.length;
+var newPos=cursorPos+(newLen-oldLen);
+if(newPos<0)newPos=0;
+if(newPos>newLen)newPos=newLen;
+this.setSelectionRange(newPos,newPos);
+if(latestSellRate){
+var val=parseRupiahInput(formatted);
+var gram=val/latestSellRate;
+sellGram.value=gram>0?formatGramCalc(gram):'';
+}
 isCalcUpdating=false;
 });
 }
