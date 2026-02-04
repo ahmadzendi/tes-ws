@@ -85,32 +85,6 @@ SUSPICIOUS_PATHS = {
     "/shell", "/cmd", "/exec", "/eval", "/system", "/passwd", "/etc",
 }
 
-HARI_INDO = ("Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu")
-
-SVG_ROCKET = '''<svg class="st-icon st-up" viewBox="0 0 24 24"><path d="M13.13 22.19L11.5 18.36C13.07 17.78 14.54 17 15.9 16.09L13.13 22.19M5.64 12.5L1.81 10.87L7.91 8.1C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39C21.61 2.39 16.66 .269 11 5.93C8.81 8.12 7.5 10.53 6.65 12.64C6.37 13.39 6.56 14.21 7.11 14.77L9.24 16.89C9.79 17.45 10.61 17.63 11.36 17.35C13.5 16.53 15.88 15.19 18.07 13C23.73 7.34 21.61 2.39 21.61 2.39M14.54 9.46C13.76 8.68 13.76 7.41 14.54 6.63S16.59 5.85 17.37 6.63C18.14 7.41 18.15 8.68 17.37 9.46C16.59 10.24 15.32 10.24 14.54 9.46M8.88 16.53L7.47 15.12L8.88 16.53M6.24 22L9.88 18.36C9.54 18.27 9.21 18.12 8.91 17.91L4.83 22H6.24M2 22H3.41L8.18 17.24L6.76 15.83L2 20.59V22M2 19.17L6.09 15.09C5.88 14.79 5.73 14.47 5.64 14.12L2 17.76V19.17Z"/></svg>'''
-
-SVG_DOWN = '''<svg class="st-icon st-down" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM12 17l-5-5h3V8h4v4h3l-5 5z"/></svg>'''
-
-SVG_NEUTRAL = '''<svg class="st-icon st-neutral" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>'''
-
-SVG_ROCKET_SMALL = '''<svg class="st-icon-sm st-up" viewBox="0 0 24 24"><path d="M13.13 22.19L11.5 18.36C13.07 17.78 14.54 17 15.9 16.09L13.13 22.19M5.64 12.5L1.81 10.87L7.91 8.1C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39C21.61 2.39 16.66 .269 11 5.93C8.81 8.12 7.5 10.53 6.65 12.64C6.37 13.39 6.56 14.21 7.11 14.77L9.24 16.89C9.79 17.45 10.61 17.63 11.36 17.35C13.5 16.53 15.88 15.19 18.07 13C23.73 7.34 21.61 2.39 21.61 2.39M14.54 9.46C13.76 8.68 13.76 7.41 14.54 6.63S16.59 5.85 17.37 6.63C18.14 7.41 18.15 8.68 17.37 9.46C16.59 10.24 15.32 10.24 14.54 9.46M8.88 16.53L7.47 15.12L8.88 16.53M6.24 22L9.88 18.36C9.54 18.27 9.21 18.12 8.91 17.91L4.83 22H6.24M2 22H3.41L8.18 17.24L6.76 15.83L2 20.59V22M2 19.17L6.09 15.09C5.88 14.79 5.73 14.47 5.64 14.12L2 17.76V19.17Z"/></svg>'''
-
-SVG_DOWN_SMALL = '''<svg class="st-icon-sm st-down" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM12 17l-5-5h3V8h4v4h3l-5 5z"/></svg>'''
-
-SVG_NEUTRAL_SMALL = '''<svg class="st-icon-sm st-neutral" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>'''
-
-STATUS_ICONS = {
-    "🚀": SVG_ROCKET,
-    "🔻": SVG_DOWN,
-    "➖": SVG_NEUTRAL
-}
-
-STATUS_ICONS_SMALL = {
-    "🚀": SVG_ROCKET_SMALL,
-    "🔻": SVG_DOWN_SMALL,
-    "➖": SVG_NEUTRAL_SMALL
-}
-
 aiohttp_session: Optional["aiohttp.ClientSession"] = None
 treasury_ws: Optional[aiohttp.ClientWebSocketResponse] = None
 treasury_ws_connected: bool = False
@@ -155,15 +129,6 @@ class RateLimiter:
             return False, request_count, "limited"
         self._requests[ip].append(now)
         return True, request_count + 1, "ok"
-    
-    def get_stats(self, ip: str) -> dict:
-        now = time.time()
-        cutoff = now - RATE_LIMIT_WINDOW
-        if ip in self._requests:
-            count = len([t for t in self._requests[ip] if t > cutoff])
-        else:
-            count = 0
-        return {"ip": ip, "requests_in_window": count, "limit": RATE_LIMIT_MAX_REQUESTS, "window_seconds": RATE_LIMIT_WINDOW}
 
 
 rate_limiter = RateLimiter()
@@ -192,13 +157,6 @@ class StateCache:
             self._cache = build_full_state_bytes()
             self._cache_time = now
             return self._cache
-    
-    def get_state_bytes_sync(self) -> bytes:
-        if self._cache:
-            return self._cache
-        self._cache = build_full_state_bytes()
-        self._cache_time = asyncio.get_event_loop().time()
-        return self._cache
 
 
 state_cache = StateCache()
@@ -229,7 +187,10 @@ class ConnectionManager:
             return
         connections = list(self._connections)
         failed = []
-        results = await asyncio.gather(*[self._send_safe(ws, message) for ws in connections], return_exceptions=True)
+        results = await asyncio.gather(
+            *[self._send_safe(ws, message) for ws in connections],
+            return_exceptions=True
+        )
         for ws, result in zip(connections, results):
             if result is False or isinstance(result, Exception):
                 failed.append(ws)
@@ -306,22 +267,18 @@ def get_time_only(date_str: str) -> str:
 
 
 def format_waktu_only(date_str: str, status: str) -> str:
-    icon = STATUS_ICONS.get(status, SVG_NEUTRAL)
-    return f"{get_time_only(date_str)}{icon}"
+    return f"{get_time_only(date_str)}{status}"
 
 
 @lru_cache(maxsize=256)
 def format_diff_display(diff: int, status: str) -> str:
-    icon = STATUS_ICONS_SMALL.get(status, SVG_NEUTRAL_SMALL)
     if status == "🚀":
-        return f'{icon}<span class="diff-up-sm">+{format_rupiah(diff)}</span>'
+        return f"🚀+{format_rupiah(diff)}"
     elif status == "🔻":
-        return f'{icon}<span class="diff-down-sm">-{format_rupiah(abs(diff))}</span>'
-    return f'{icon}<span class="diff-neutral-sm">tetap</span>'
+        return f"🔻-{format_rupiah(abs(diff))}"
+    return "➖tetap"
 
 
-def format_transaction_display(buy: str, sell: str, diff_display: str) -> str:
-    return f'<span class="tx-row"><span class="tx-label">Beli:</span><span class="tx-val">{buy}</span><span class="tx-label">Jual:</span><span class="tx-val">{sell}</span><span class="tx-diff">{diff_display}</span></span>'
 PROFIT_CONFIGS = [
     (10000000, 9669000),
     (20000000, 19330000),
@@ -339,10 +296,10 @@ def calc_profit(h: dict, modal: int, pokok: int) -> str:
         val = int(gram * sell_rate - pokok)
         gram_str = f"{gram:,.4f}".replace(",", ".")
         if val > 0:
-            return f'<span class="profit-up">+{format_rupiah(val)}</span><span class="profit-icon-up">▲</span><span class="gram-text">{gram_str}gr</span>'
+            return f"+{format_rupiah(val)}🟢{gram_str}gr"
         elif val < 0:
-            return f'<span class="profit-down">-{format_rupiah(abs(val))}</span><span class="profit-icon-down">▼</span><span class="gram-text">{gram_str}gr</span>'
-        return f'<span class="profit-neutral">{format_rupiah(0)}</span><span class="profit-icon-neutral">●</span><span class="gram-text">{gram_str}gr</span>'
+            return f"-{format_rupiah(abs(val))}🔴{gram_str}gr"
+        return f"{format_rupiah(0)}➖{gram_str}gr"
     except:
         return "-"
 
@@ -354,9 +311,10 @@ def build_single_history_item(h: dict) -> dict:
     return {
         "buying_rate": buy_fmt,
         "selling_rate": sell_fmt,
+        "buying_rate_raw": h["buying_rate"],
+        "selling_rate_raw": h["selling_rate"],
         "waktu_display": format_waktu_only(h["created_at"], h["status"]),
         "diff_display": diff_display,
-        "transaction_display": format_transaction_display(buy_fmt, sell_fmt, diff_display),
         "created_at": h["created_at"],
         "jt10": calc_profit(h, *PROFIT_CONFIGS[0]),
         "jt20": calc_profit(h, *PROFIT_CONFIGS[1]),
@@ -473,7 +431,6 @@ class BroadcastDebouncer:
 
 debouncer = BroadcastDebouncer()
 
-
 TREASURY_WS_URL = "wss://ws-ap1.pusher.com/app/52e99bd2c3c42e577e13?protocol=7&client=js&version=7.0.3&flash=false"
 TREASURY_CHANNEL = "gold-rate"
 TREASURY_EVENT = "gold-rate-event"
@@ -525,12 +482,19 @@ async def treasury_ws_loop():
     while True:
         try:
             session = await get_aiohttp_session()
-            async with session.ws_connect(TREASURY_WS_URL, heartbeat=20, receive_timeout=45) as ws:
+            async with session.ws_connect(
+                TREASURY_WS_URL,
+                heartbeat=20,
+                receive_timeout=45
+            ) as ws:
                 treasury_ws = ws
                 treasury_ws_connected = True
                 consecutive_errors = 0
                 print("Treasury WebSocket connected")
-                subscribe_msg = {"event": "pusher:subscribe", "data": {"channel": TREASURY_CHANNEL}}
+                subscribe_msg = {
+                    "event": "pusher:subscribe",
+                    "data": {"channel": TREASURY_CHANNEL}
+                }
                 await ws.send_str(json_dumps(subscribe_msg))
                 print(f"Subscribed to channel: {TREASURY_CHANNEL}")
                 async for msg in ws:
@@ -578,10 +542,16 @@ async def usd_idr_loop():
         try:
             price = await fetch_usd_idr_price()
             if price:
-                should_update = (not usd_idr_history or usd_idr_history[-1]["price"] != price)
+                should_update = (
+                    not usd_idr_history or 
+                    usd_idr_history[-1]["price"] != price
+                )
                 if should_update:
                     wib = datetime.utcnow() + timedelta(hours=7)
-                    usd_idr_history.append({"price": price, "time": wib.strftime("%H:%M:%S")})
+                    usd_idr_history.append({
+                        "price": price, 
+                        "time": wib.strftime("%H:%M:%S")
+                    })
                     asyncio.create_task(debouncer.schedule_broadcast())
             await asyncio.sleep(USD_POLL_INTERVAL)
         except asyncio.CancelledError:
@@ -630,9 +600,8 @@ table.dataTable{width:100%!important;border-collapse:collapse}
 table.dataTable thead th{font-weight:bold;white-space:nowrap;padding:10px 8px;font-size:1em;border-bottom:2px solid #ddd}
 table.dataTable tbody td{padding:8px 6px;white-space:nowrap;border-bottom:1px solid #eee;font-size:1em}
 th.waktu,td.waktu{width:78px;min-width:72px;max-width:82px;text-align:center;padding-left:2px!important;padding-right:2px!important}
-/* Base Desktop Styles */
-th.transaksi,td.transaksi{text-align:left;min-width:255px;padding-right:8px!important}
-th.profit,td.profit{width:135px;min-width:130px;max-width:145px;text-align:left;padding-left:8px!important;padding-right:8px!important}
+th.transaksi,td.transaksi{text-align:left;min-width:220px}
+th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;padding-left:8px!important;padding-right:8px!important}
 .theme-toggle-btn{padding:0;border:none;border-radius:50%;background:#222;color:#fff;cursor:pointer;font-size:1.5em;width:44px;height:44px;display:flex;align-items:center;justify-content:center;transition:background .3s}
 .theme-toggle-btn:hover{background:#444}
 .dark-mode{background:#181a1b!important;color:#e0e0e0!important}
@@ -646,12 +615,17 @@ th.profit,td.profit{width:135px;min-width:130px;max-width:145px;text-align:left;
 .card{border:1px solid #ccc;border-radius:6px;padding:10px}
 .card-usd{width:248px;height:370px;overflow-y:auto}
 .card-chart{flex:1;min-width:400px;height:370px;overflow:hidden}
-.card-calendar{width:100%;max-width:750px;height:460px;overflow:hidden;display:flex;flex-direction:column}
+.card-calendar{flex:1;min-width:400px;height:460px;overflow:hidden;display:flex;flex-direction:column}
+.card-calc-buy{width:320px;padding:15px}
+.card-calc-sell{width:320px;padding:15px}
+.calc-wrap{display:flex;flex-direction:column;gap:0}
 #priceList{list-style:none;padding:0;margin:0;max-height:275px;overflow-y:auto}
 #priceList li{margin-bottom:1px}
 .time{color:gray;font-size:.9em;margin-left:10px}
 #currentPrice{color:red;font-weight:bold}
 .dark-mode #currentPrice{color:#00E124;text-shadow:1px 1px #00B31C}
+#tabel tbody tr:first-child td{color:red!important;font-weight:bold}
+.dark-mode #tabel tbody tr:first-child td{color:#00E124!important}
 #footerApp{width:100%;position:fixed;bottom:0;left:0;background:transparent;text-align:center;z-index:100;padding:8px 0}
 .marquee-text{display:inline-block;color:#F5274D;animation:marquee 70s linear infinite;font-weight:bold}
 .dark-mode .marquee-text{color:#B232B2}
@@ -660,13 +634,12 @@ th.profit,td.profit{width:135px;min-width:130px;max-width:145px;text-align:left;
 .tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .dataTables_wrapper{position:relative}
 .dt-top-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:0!important;padding:8px 0;padding-bottom:0!important}
-.dataTables_wrapper .dataTables_length{margin:0!important;float:none!important;margin-bottom:0!important;padding-bottom:0!important}
+.dataTables_wrapper .dataTables_length{margin:0!important;float:none!important}
 .dataTables_wrapper .dataTables_filter{margin:0!important;float:none!important}
 .dataTables_wrapper .dataTables_info{display:none!important}
 .dataTables_wrapper .dataTables_paginate{margin-top:10px!important;text-align:center!important}
-.tbl-wrap{margin-top:0!important;padding-top:0!important}
 #tabel.dataTable{margin-top:0!important}
-#tabel tbody td.transaksi{padding:6px 8px 6px 4px;white-space:nowrap}
+#tabel tbody td.transaksi{padding:6px 8px;white-space:nowrap}
 .profit-order-btns{display:none;gap:3px;align-items:center;margin-right:6px}
 .profit-btn{padding:5px 10px;border:1px solid #aaa;background:#f0f0f0;border-radius:4px;font-size:12px;cursor:pointer;font-weight:bold;transition:all .2s}
 .profit-btn:hover{background:#ddd}
@@ -678,7 +651,8 @@ th.profit,td.profit{width:135px;min-width:130px;max-width:145px;text-align:left;
 .tradingview-wrapper{height:100%;width:100%;overflow:hidden}
 .calendar-section{width:100%;margin-top:20px;margin-bottom:60px}
 .calendar-section h3{margin:0 0 10px}
-.calendar-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.calendar-calc-wrap{display:flex;gap:15px;flex-wrap:wrap}
+.calendar-wrap{flex:1;min-width:500px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .calendar-iframe{border:0;width:100%;height:420px;min-width:700px;display:block}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-top:0;margin-bottom:10px}
 .chart-header h3{margin:0}
@@ -688,62 +662,33 @@ th.profit,td.profit{width:135px;min-width:130px;max-width:145px;text-align:left;
 .dark-mode .limit-label .limit-num{background:#00E124;color:#181a1b}
 .dark-mode .card{border-color:#444}
 .dark-mode .card-calendar{background:#23272b}
-#tabel thead th.waktu{position:sticky;left:0;z-index:3;background:#fff}
-#tabel tbody td.waktu{position:sticky;left:0;z-index:2;background:#fff}
+#tabel thead th.waktu,#tabel tbody td.waktu{position:sticky;left:0;z-index:2;background:#fff}
+#tabel thead th.waktu{z-index:3}
 .dark-mode #tabel thead th.waktu{background:#23272b}
 .dark-mode #tabel tbody td.waktu{background:#23272b}
-#tabel tbody tr:first-child td{background-color:#e0e0e0;font-weight:600}
-#tabel tbody tr:first-child td.waktu{background-color:#e0e0e0}
-.dark-mode #tabel tbody tr:first-child td{background-color:#3a3f44}
-.dark-mode #tabel tbody tr:first-child td.waktu{background-color:#3a3f44}
-@keyframes blink-waktu-light{
-0%{background-color:#e0e0e0}
-25%{background-color:#ffeb3b}
-50%{background-color:#e0e0e0}
-75%{background-color:#ffeb3b}
-100%{background-color:#e0e0e0}
-}
-@keyframes blink-waktu-dark{
-0%{background-color:#3a3f44}
-25%{background-color:#ffd600}
-50%{background-color:#3a3f44}
-75%{background-color:#ffd600}
-100%{background-color:#3a3f44}
-}
-#tabel tbody tr.blink-row td.waktu{animation:blink-waktu-light 0.5s ease-in-out 3}
-.dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-waktu-dark 0.5s ease-in-out 3}
-.st-icon{display:inline-block;width:16px;height:16px;vertical-align:middle;margin-left:3px;fill:currentColor}
-.st-icon-sm{display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:2px;fill:currentColor}
-.st-up{color:#00C853}
-.st-down{color:#FF1744}
-.st-neutral{color:#9E9E9E}
-.dark-mode .st-up{color:#00E676}
-.dark-mode .st-down{color:#FF5252}
-.dark-mode .st-neutral{color:#BDBDBD}
-.tx-row{display:inline-flex;align-items:center;gap:2px;flex-wrap:nowrap}
-.tx-label{font-size:0.82em;color:#666}
-.tx-val{font-size:1.38em;font-weight:600;margin-right:0px;color:#222}
-.dark-mode .tx-label{color:#aaa}
-.dark-mode .tx-val{color:#e0e0e0}
-.tx-diff{display:inline-flex;align-items:center;margin-left:-2px;padding:1px 3px;background:rgba(0,0,0,0.05);border-radius:3px}
-.dark-mode .tx-diff{background:rgba(255,255,255,0.08)}
-.diff-up-sm{color:#00C853;font-weight:bold;font-size:0.92em}
-.diff-down-sm{color:#FF1744;font-weight:bold;font-size:0.92em}
-.diff-neutral-sm{color:#9E9E9E;font-size:0.92em}
-.dark-mode .diff-up-sm{color:#00E676}
-.dark-mode .diff-down-sm{color:#FF5252}
-.dark-mode .diff-neutral-sm{color:#BDBDBD}
-.profit-up{color:#00C853;font-weight:bold}
-.profit-down{color:#FF1744;font-weight:bold}
-.profit-neutral{color:#9E9E9E}
-.profit-icon-up{color:#00C853;margin:0 2px;font-size:0.8em}
-.profit-icon-down{color:#FF1744;margin:0 2px;font-size:0.8em}
-.profit-icon-neutral{color:#9E9E9E;margin:0 2px;font-size:0.6em}
-.gram-text{font-size:0.9em}
-@keyframes pulse-up{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
-@keyframes pulse-down{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
-.dark-mode .profit-up,.dark-mode .profit-icon-up{color:#00E676}
-.dark-mode .profit-down,.dark-mode .profit-icon-down{color:#FF5252}
+@keyframes blink-yellow{0%,100%{background-color:#fff}50%{background-color:#ffeb3b}}
+@keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
+#tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
+.dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
+.calc-title{font-size:1.1em;font-weight:bold;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #007bff;display:flex;align-items:center;gap:8px}
+.calc-title.buy-title{border-color:#28a745;color:#28a745}
+.calc-title.sell-title{border-color:#dc3545;color:#dc3545}
+.dark-mode .calc-title.buy-title{color:#4caf50}
+.dark-mode .calc-title.sell-title{color:#f44336}
+.calc-rate{font-size:0.85em;color:#666;margin-bottom:12px;padding:8px 10px;background:#f5f5f5;border-radius:4px}
+.dark-mode .calc-rate{background:#2a2a2a;color:#aaa}
+.calc-row{margin-bottom:12px}
+.calc-label{font-size:0.85em;color:#555;margin-bottom:4px;font-weight:500}
+.dark-mode .calc-label{color:#bbb}
+.calc-input{width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:6px;font-size:1em;transition:border-color .2s,box-shadow .2s}
+.calc-input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 3px rgba(0,123,255,0.15)}
+.calc-input.buy-input:focus{border-color:#28a745;box-shadow:0 0 0 3px rgba(40,167,69,0.15)}
+.calc-input.sell-input:focus{border-color:#dc3545;box-shadow:0 0 0 3px rgba(220,53,69,0.15)}
+.dark-mode .calc-input{background:#2a2a2a;border-color:#444;color:#e0e0e0}
+.dark-mode .calc-input:focus{border-color:#29b6f6}
+.calc-icon{font-size:1.2em}
+.calc-note{font-size:0.75em;color:#888;margin-top:8px;font-style:italic}
+.dark-mode .calc-note{color:#666}
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -757,20 +702,23 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .container-flex{flex-direction:row;gap:15px}
 .card-usd{width:220px;height:350px}
 .card-chart{flex:1;min-width:350px;height:350px}
-.card-calendar{max-width:100%;height:auto}
+.card-calendar{max-width:100%;height:auto;min-width:300px}
+.card-calc-buy,.card-calc-sell{width:260px}
 .calendar-iframe{height:400px;min-width:680px}
+.calendar-calc-wrap{flex-direction:row}
+.calendar-wrap{min-width:400px}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:8px;margin-bottom:8px;padding:6px 0}
 .dataTables_wrapper .dataTables_length{font-size:14px!important}
 .dataTables_wrapper .dataTables_filter{font-size:14px!important}
 .dataTables_wrapper .dataTables_filter input{width:100px!important;font-size:14px!important;padding:5px 8px!important}
 .dataTables_wrapper .dataTables_length select{font-size:14px!important;padding:4px!important}
 .dataTables_wrapper .dataTables_paginate .paginate_button{padding:6px 14px!important;font-size:14px!important}
-#tabel{min-width:1050px!important;table-layout:fixed!important}
+#tabel{min-width:1000px!important;table-layout:fixed!important}
 #tabel thead th{font-size:15px!important;padding:10px 6px!important;font-weight:bold!important}
 #tabel tbody td{font-size:14px!important;padding:9px 5px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:80px!important;min-width:75px!important;max-width:85px!important;padding-left:3px!important;padding-right:3px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:275px!important;min-width:270px!important;max-width:285px!important;padding:8px 8px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:135px!important;min-width:130px!important;max-width:145px!important;padding-left:8px!important;padding-right:6px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:250px!important;min-width:245px!important;max-width:255px!important;padding:8px 10px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:135px!important;padding-left:6px!important;padding-right:6px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:6px 12px;font-size:13px}
 .chart-header{flex-direction:row;gap:10px}
@@ -792,9 +740,12 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
 .card-usd{height:auto;min-height:300px}
 .card-chart{height:360px}
-.card-calendar{max-width:100%;height:auto;padding:0}
+.card-calendar{max-width:100%;height:auto;padding:0;min-width:0}
+.card-calc-buy,.card-calc-sell{width:100%}
 .calendar-section{margin-bottom:50px}
-.calendar-wrap{margin:0 -12px;padding:0 12px;width:calc(100% + 24px)}
+.calendar-calc-wrap{flex-direction:column}
+.calc-wrap{flex-direction:column}
+.calendar-wrap{margin:0 -12px;padding:0 12px;width:calc(100% + 24px);min-width:0}
 .calendar-iframe{height:380px;min-width:620px}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:5px;margin-bottom:8px;padding:5px 0}
 .dataTables_wrapper .dataTables_length{font-size:13px!important}
@@ -802,12 +753,12 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .dataTables_wrapper .dataTables_filter input{width:85px!important;font-size:13px!important;padding:4px 6px!important}
 .dataTables_wrapper .dataTables_length select{font-size:13px!important;padding:3px!important}
 .dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 12px!important;font-size:13px!important}
-#tabel{min-width:1000px!important;table-layout:fixed!important}
+#tabel{min-width:950px!important;table-layout:fixed!important}
 #tabel thead th{font-size:14px!important;padding:9px 5px!important;font-weight:bold!important}
 #tabel tbody td{font-size:13px!important;padding:8px 4px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:75px!important;min-width:70px!important;max-width:80px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:265px!important;min-width:260px!important;max-width:275px!important;padding:7px 6px 7px 8px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:140px!important;padding-left:8px!important;padding-right:5px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:235px!important;min-width:230px!important;max-width:240px!important;padding:7px 8px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:125px!important;min-width:120px!important;max-width:130px!important;padding-left:5px!important;padding-right:5px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 10px;font-size:12px}
 .chart-header{flex-direction:row;gap:8px}
@@ -830,9 +781,12 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .card-usd{height:auto;min-height:280px}
 .card-chart{height:340px}
 .card{padding:8px}
-.card-calendar{height:auto;padding:0}
+.card-calendar{height:auto;padding:0;min-width:0}
+.card-calc-buy,.card-calc-sell{width:100%}
 .calendar-section{margin:18px 0 45px 0}
-.calendar-wrap{margin:0 -10px;padding:0 10px;width:calc(100% + 20px)}
+.calendar-calc-wrap{flex-direction:column}
+.calc-wrap{flex-direction:column}
+.calendar-wrap{margin:0 -10px;padding:0 10px;width:calc(100% + 20px);min-width:0}
 .calendar-iframe{height:360px;min-width:580px}
 #footerApp{padding:6px 0}
 .marquee-text{font-size:12px}
@@ -842,12 +796,12 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .dataTables_wrapper .dataTables_length select{font-size:12px!important}
 .dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 10px!important;font-size:12px!important}
 #priceList{max-height:220px}
-#tabel{min-width:950px!important;table-layout:fixed!important}
+#tabel{min-width:900px!important;table-layout:fixed!important}
 #tabel thead th{font-size:13px!important;padding:8px 4px!important;font-weight:bold!important}
 #tabel tbody td{font-size:12px!important;padding:7px 3px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:72px!important;min-width:68px!important;max-width:76px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:250px!important;min-width:245px!important;max-width:260px!important;padding:6px 4px 6px 6px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:120px!important;min-width:115px!important;max-width:130px!important;padding-left:4px!important;padding-right:4px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:220px!important;min-width:215px!important;max-width:225px!important;padding:6px 6px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:118px!important;min-width:113px!important;max-width:123px!important;padding-left:4px!important;padding-right:4px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 9px;font-size:11px}
 .chart-header h3{font-size:0.9em}
@@ -870,9 +824,12 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .card-usd{height:auto;min-height:260px}
 .card-chart{height:320px}
 .card{padding:6px}
-.card-calendar{height:auto;padding:0}
+.card-calendar{height:auto;padding:0;min-width:0}
+.card-calc-buy,.card-calc-sell{width:100%}
 .calendar-section{margin:15px 0 40px 0}
-.calendar-wrap{margin:0 -8px;padding:0 8px;width:calc(100% + 16px)}
+.calendar-calc-wrap{flex-direction:column}
+.calc-wrap{flex-direction:column}
+.calendar-wrap{margin:0 -8px;padding:0 8px;width:calc(100% + 16px);min-width:0}
 .calendar-iframe{height:340px;min-width:550px}
 #footerApp{padding:5px 0}
 .marquee-text{font-size:11px}
@@ -882,26 +839,24 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .dataTables_wrapper .dataTables_length select{font-size:11px!important}
 .dataTables_wrapper .dataTables_paginate .paginate_button{padding:4px 8px!important;font-size:11px!important}
 #priceList{max-height:190px}
-#tabel{min-width:900px!important;table-layout:fixed!important}
+#tabel{min-width:850px!important;table-layout:fixed!important}
 #tabel thead th{font-size:12px!important;padding:7px 3px!important;font-weight:bold!important}
 #tabel tbody td{font-size:11px!important;padding:6px 3px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:68px!important;min-width:64px!important;max-width:72px!important;padding-left:2px!important;padding-right:2px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:240px!important;min-width:235px!important;max-width:250px!important;padding:5px 2px 5px 5px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:115px!important;min-width:110px!important;max-width:120px!important;padding-left:2px!important;padding-right:3px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:210px!important;min-width:205px!important;max-width:215px!important;padding:5px 5px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:110px!important;min-width:105px!important;max-width:115px!important;padding-left:3px!important;padding-right:3px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:4px 7px;font-size:10px}
 .chart-header h3{font-size:0.85em}
 .limit-label{font-size:0.78em}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
-.st-icon-sm{width:12px;height:12px}
-.tx-main{font-size:1.08em;font-weight:500}
 }
 </style>
 </head>
 <body>
 <div class="header">
 <div class="title-wrap">
-<h2>Harga Emas Treasury  ➺ </h2>
+<h2>Harga Emas Treasury ➺</h2>
 <a href="https://t.me/+FLtJjyjVV8xlM2E1" target="_blank" class="tele-link" title="Join Telegram"><span class="tele-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg></span><span class="tele-text">Telegram</span></a>
 </div>
 <button class="theme-toggle-btn" id="themeBtn" onclick="toggleTheme()" title="Ganti Tema">🌙</button>
@@ -943,10 +898,40 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 </div>
 <div class="calendar-section">
-<h3>Kalender Ekonomi</h3>
+<h3>Kalender Ekonomi & Kalkulator Emas</h3>
+<div class="calendar-calc-wrap">
 <div class="card card-calendar">
 <div class="calendar-wrap">
 <iframe class="calendar-iframe" src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
+</div>
+</div>
+<div class="calc-wrap">
+<div class="card card-calc-buy">
+<div class="calc-title buy-title"><span class="calc-icon">💰</span> Kalkulator Tumbas Emas</div>
+<div class="calc-rate">Harga Beli: <strong id="calcBuyRate">-</strong> /gram</div>
+<div class="calc-row">
+<div class="calc-label">Masukkan Rupiah (IDR)</div>
+<input type="text" id="buyRupiah" class="calc-input buy-input" placeholder="Contoh: 88.000.000" inputmode="numeric">
+</div>
+<div class="calc-row">
+<div class="calc-label">Dapat Emas (gram)</div>
+<input type="text" id="buyGram" class="calc-input buy-input" placeholder="Contoh: 0,8888" inputmode="decimal">
+</div>
+<p class="calc-note">*Berdasarkan harga beli terakhir Treasury</p>
+</div>
+<div class="card card-calc-sell">
+<div class="calc-title sell-title"><span class="calc-icon">💸</span> Kalkulator Jual Emas</div>
+<div class="calc-rate">Harga Jual: <strong id="calcSellRate">-</strong> /gram</div>
+<div class="calc-row">
+<div class="calc-label">Masukkan Gram Emas</div>
+<input type="text" id="sellGram" class="calc-input sell-input" placeholder="Contoh: 8,0000" inputmode="decimal">
+</div>
+<div class="calc-row">
+<div class="calc-label">Dapat Rupiah (IDR)</div>
+<input type="text" id="sellRupiah" class="calc-input sell-input" placeholder="Contoh: 88.000.000" inputmode="numeric">
+</div>
+<p class="calc-note">*Berdasarkan harga jual terakhir Treasury</p>
+</div>
 </div>
 </div>
 </div>
@@ -966,6 +951,108 @@ var savedPriority=localStorage.getItem('profitPriority');
 var profitPriority=(savedPriority&&['jt10','jt20','jt30','jt40','jt50'].indexOf(savedPriority)!==-1)?savedPriority:'jt10';
 var headerLabels={'jt10':'Est.cuan 10JT ➺ gr','jt20':'Est.cuan 20JT ➺ gr','jt30':'Est.cuan 30JT ➺ gr','jt40':'Est.cuan 40JT ➺ gr','jt50':'Est.cuan 50JT ➺ gr'};
 var blinkTimeout=null;
+var currentBuyRate=0;
+var currentSellRate=0;
+var isUpdatingBuy=false;
+var isUpdatingSell=false;
+function formatRupiah(num){
+if(!num&&num!==0)return'';
+return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+function parseRupiah(str){
+if(!str)return 0;
+return parseInt(str.replace(/\./g,''),10)||0;
+}
+function formatGram(num){
+if(!num&&num!==0)return'';
+return num.toFixed(4).replace('.',',');
+}
+function parseGram(str){
+if(!str)return 0;
+return parseFloat(str.replace(',','.'))||0;
+}
+function updateCalculatorRates(buyRate,sellRate){
+currentBuyRate=buyRate;
+currentSellRate=sellRate;
+$('#calcBuyRate').text(formatRupiah(buyRate));
+$('#calcSellRate').text(formatRupiah(sellRate));
+var buyRupiahVal=$('#buyRupiah').val();
+var sellGramVal=$('#sellGram').val();
+if(buyRupiahVal){
+var rp=parseRupiah(buyRupiahVal);
+if(rp>0&&currentBuyRate>0){
+isUpdatingBuy=true;
+$('#buyGram').val(formatGram(rp/currentBuyRate));
+isUpdatingBuy=false;
+}
+}
+if(sellGramVal){
+var gr=parseGram(sellGramVal);
+if(gr>0&&currentSellRate>0){
+isUpdatingSell=true;
+$('#sellRupiah').val(formatRupiah(Math.round(gr*currentSellRate)));
+isUpdatingSell=false;
+}
+}
+}
+$('#buyRupiah').on('input',function(){
+if(isUpdatingBuy)return;
+var val=$(this).val().replace(/[^\d]/g,'');
+var num=parseInt(val,10)||0;
+isUpdatingBuy=true;
+$(this).val(num>0?formatRupiah(num):'');
+if(num>0&&currentBuyRate>0){
+$('#buyGram').val(formatGram(num/currentBuyRate));
+}else{
+$('#buyGram').val('');
+}
+isUpdatingBuy=false;
+});
+$('#buyGram').on('input',function(){
+if(isUpdatingBuy)return;
+var val=$(this).val().replace(/[^\d,\.]/g,'').replace('.',',');
+var parts=val.split(',');
+if(parts.length>2){val=parts[0]+','+parts.slice(1).join('')}
+if(parts[1]&&parts[1].length>4){val=parts[0]+','+parts[1].substring(0,4)}
+isUpdatingBuy=true;
+$(this).val(val);
+var gram=parseGram(val);
+if(gram>0&&currentBuyRate>0){
+$('#buyRupiah').val(formatRupiah(Math.round(gram*currentBuyRate)));
+}else{
+$('#buyRupiah').val('');
+}
+isUpdatingBuy=false;
+});
+$('#sellGram').on('input',function(){
+if(isUpdatingSell)return;
+var val=$(this).val().replace(/[^\d,\.]/g,'').replace('.',',');
+var parts=val.split(',');
+if(parts.length>2){val=parts[0]+','+parts.slice(1).join('')}
+if(parts[1]&&parts[1].length>4){val=parts[0]+','+parts[1].substring(0,4)}
+isUpdatingSell=true;
+$(this).val(val);
+var gram=parseGram(val);
+if(gram>0&&currentSellRate>0){
+$('#sellRupiah').val(formatRupiah(Math.round(gram*currentSellRate)));
+}else{
+$('#sellRupiah').val('');
+}
+isUpdatingSell=false;
+});
+$('#sellRupiah').on('input',function(){
+if(isUpdatingSell)return;
+var val=$(this).val().replace(/[^\d]/g,'');
+var num=parseInt(val,10)||0;
+isUpdatingSell=true;
+$(this).val(num>0?formatRupiah(num):'');
+if(num>0&&currentSellRate>0){
+$('#sellGram').val(formatGram(num/currentSellRate));
+}else{
+$('#sellGram').val('');
+}
+isUpdatingSell=false;
+});
 function getOrderedProfitKeys(){
 var all=['jt10','jt20','jt30','jt40','jt50'];
 var result=[profitPriority];
@@ -1028,10 +1115,8 @@ if(blinkTimeout){clearTimeout(blinkTimeout)}
 var firstRow=$('#tabel tbody tr:first-child');
 if(!firstRow.length)return;
 firstRow.removeClass('blink-row');
-firstRow[0].offsetHeight;
-setTimeout(function(){
+void firstRow[0].offsetWidth;
 firstRow.addClass('blink-row');
-},10);
 blinkTimeout=setTimeout(function(){
 firstRow.removeClass('blink-row');
 blinkTimeout=null;
@@ -1044,12 +1129,18 @@ var newTopRowId=getTopRowId(h);
 var isNewData=newTopRowId!==lastTopRowId;
 if(isNewData){lastTopRowId=newTopRowId}
 h.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
+if(h.length>0){
+var latest=h[0];
+if(latest.buying_rate_raw&&latest.selling_rate_raw){
+updateCalculatorRates(latest.buying_rate_raw,latest.selling_rate_raw);
+}
+}
 var keys=getOrderedProfitKeys();
 updateTableHeaders();
 var arr=h.map(function(d){
 return{
 waktu:d.waktu_display,
-transaction:d.transaction_display,
+transaction:'Beli: '+d.buying_rate+' Jual: '+d.selling_rate+''+d.diff_display,
 p1:d[keys[0]],
 p2:d[keys[1]],
 p3:d[keys[2]],
@@ -1060,7 +1151,7 @@ p5:d[keys[4]]
 table.clear().rows.add(arr).draw(false);
 table.page('first').draw(false);
 if(isNewData&&!isFirstRender){
-setTimeout(function(){triggerBlinkEffect()},100);
+setTimeout(function(){triggerBlinkEffect()},50);
 }
 if(isFirstRender){isFirstRender=false}
 }
@@ -1138,7 +1229,6 @@ function updateJam(){
 var n=new Date();
 var days=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 var hari=days[n.getDay()];
-var tgl=n.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
 var jam=n.toLocaleTimeString('id-ID',{hour12:false});
 document.getElementById("jam").textContent=hari+", "+jam+" WIB";
 }
@@ -1188,14 +1278,14 @@ async def security_middleware(request: Request, call_next):
     path = request.url.path
     path_lower = path.lower()
     if is_ip_blocked(client_ip):
-        return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
+        return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html")
     if path not in RATE_LIMIT_WHITELIST:
         allowed, count, status = rate_limiter.check_rate_limit(client_ip)
         if status == "blocked":
             block_ip(client_ip, 600)
-            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
+            return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html")
         if not allowed:
-            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html", headers={"Retry-After": "60"})
+            return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html",headers={"Retry-After": "60"})
     if is_suspicious_path(path_lower):
         record_failed_attempt(client_ip, weight=3)
         return Response(content='{"error":"forbidden"}', status_code=403, media_type="application/json")
@@ -1212,7 +1302,7 @@ async def index():
 
 @app.get("/api/state")
 async def get_state():
-    return Response(content=await state_cache.get_state_bytes(), media_type="application/json")
+    return Response(content=await state_cache.get_state_bytes(),media_type="application/json")
 
 
 @app.get("/aturTS")
@@ -1226,7 +1316,7 @@ async def atur_ts_no_value(request: Request):
 
 
 @app.get("/aturTS/{value}")
-async def set_limit_ts(request: Request, value: str = Path(...), key: str = Query(None, description="Secret key")):
+async def set_limit_ts(request: Request,value: str = Path(...),key: str = Query(None)):
     global limit_bulan, last_successful_call
     client_ip = get_client_ip(request)
     if is_ip_blocked(client_ip):
@@ -1299,3 +1389,20 @@ async def catch_all(request: Request, path: str):
     
     record_failed_attempt(client_ip)
     raise HTTPException(status_code=404, detail="Halaman tidak ditemukan")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="warning",
+        access_log=False,
+        ws_ping_interval=20,
+        ws_ping_timeout=20,
+        limit_concurrency=500,
+        backlog=256,
+        timeout_keep_alive=30,
+    )
