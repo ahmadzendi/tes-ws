@@ -630,8 +630,8 @@ table.dataTable{width:100%!important;border-collapse:collapse}
 table.dataTable thead th{font-weight:bold;white-space:nowrap;padding:10px 8px;font-size:1em;border-bottom:2px solid #ddd}
 table.dataTable tbody td{padding:8px 6px;white-space:nowrap;border-bottom:1px solid #eee;font-size:1em}
 th.waktu,td.waktu{width:78px;min-width:72px;max-width:82px;text-align:center;padding-left:2px!important;padding-right:2px!important}
-th.transaksi,td.transaksi{text-align:left;min-width:280px}
-th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;padding-left:8px!important;padding-right:8px!important}
+th.transaksi,td.transaksi{text-align:left;min-width:240px;padding-right:0!important}
+th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;padding-left:0!important;padding-right:8px!important}
 .theme-toggle-btn{padding:0;border:none;border-radius:50%;background:#222;color:#fff;cursor:pointer;font-size:1.5em;width:44px;height:44px;display:flex;align-items:center;justify-content:center;transition:background .3s}
 .theme-toggle-btn:hover{background:#444}
 .dark-mode{background:#181a1b!important;color:#e0e0e0!important}
@@ -665,7 +665,7 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dataTables_wrapper .dataTables_paginate{margin-top:10px!important;text-align:center!important}
 .tbl-wrap{margin-top:0!important;padding-top:0!important}
 #tabel.dataTable{margin-top:0!important}
-#tabel tbody td.transaksi{padding:6px 8px;white-space:nowrap}
+#tabel tbody td.transaksi{padding:6px 0 6px 4px;white-space:nowrap}
 .profit-order-btns{display:none;gap:3px;align-items:center;margin-right:6px}
 .profit-btn{padding:5px 10px;border:1px solid #aaa;background:#f0f0f0;border-radius:4px;font-size:12px;cursor:pointer;font-weight:bold;transition:all .2s}
 .profit-btn:hover{background:#ddd}
@@ -768,8 +768,8 @@ h3{font-size:1.05em;margin:15px 0 8px}
 #tabel thead th{font-size:15px!important;padding:10px 6px!important;font-weight:bold!important}
 #tabel tbody td{font-size:14px!important;padding:9px 5px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:80px!important;min-width:75px!important;max-width:85px!important;padding-left:3px!important;padding-right:3px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:300px!important;min-width:290px!important;max-width:310px!important;padding:8px 10px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:135px!important;padding-left:6px!important;padding-right:6px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:265px!important;min-width:265px!important;max-width:285px!important;padding:8px 0 8px 10px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:135px!important;padding-left:2px!important;padding-right:6px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:6px 12px;font-size:13px}
 .chart-header{flex-direction:row;gap:10px}
@@ -805,8 +805,8 @@ h3{font-size:0.95em;margin:12px 0 8px}
 #tabel thead th{font-size:14px!important;padding:9px 5px!important;font-weight:bold!important}
 #tabel tbody td{font-size:13px!important;padding:8px 4px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:75px!important;min-width:70px!important;max-width:80px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:290px!important;min-width:280px!important;max-width:300px!important;padding:7px 8px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:125px!important;min-width:120px!important;max-width:130px!important;padding-left:5px!important;padding-right:5px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:260px!important;min-width:260px!important;max-width:280px!important;padding:7px 0 7px 8px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:125px!important;min-width:120px!important;max-width:130px!important;padding-left:2px!important;padding-right:5px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 10px;font-size:12px}
 .chart-header{flex-direction:row;gap:8px}
@@ -845,8 +845,8 @@ h3{font-size:0.92em;margin:12px 0 6px}
 #tabel thead th{font-size:13px!important;padding:8px 4px!important;font-weight:bold!important}
 #tabel tbody td{font-size:12px!important;padding:7px 3px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:72px!important;min-width:68px!important;max-width:76px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:280px!important;min-width:270px!important;max-width:290px!important;padding:6px 6px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:118px!important;min-width:113px!important;max-width:123px!important;padding-left:4px!important;padding-right:4px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:250px!important;min-width:250px!important;max-width:270px!important;padding:6px 0 6px 6px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:118px!important;min-width:113px!important;max-width:123px!important;padding-left:0!important;padding-right:4px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:5px 9px;font-size:11px}
 .chart-header h3{font-size:0.9em}
@@ -885,8 +885,8 @@ h3{font-size:0.88em;margin:10px 0 6px}
 #tabel thead th{font-size:12px!important;padding:7px 3px!important;font-weight:bold!important}
 #tabel tbody td{font-size:11px!important;padding:6px 3px!important}
 #tabel thead th.waktu,#tabel tbody td.waktu{width:68px!important;min-width:64px!important;max-width:72px!important;padding-left:2px!important;padding-right:2px!important}
-#tabel thead th.transaksi,#tabel tbody td.transaksi{width:270px!important;min-width:260px!important;max-width:280px!important;padding:5px 5px!important}
-#tabel thead th.profit,#tabel tbody td.profit{width:110px!important;min-width:105px!important;max-width:115px!important;padding-left:3px!important;padding-right:3px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:240px!important;min-width:240px!important;max-width:260px!important;padding:5px 0 5px 5px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:110px!important;min-width:105px!important;max-width:115px!important;padding-left:0!important;padding-right:3px!important}
 .profit-order-btns{display:flex}
 .profit-btn{padding:4px 7px;font-size:10px}
 .chart-header h3{font-size:0.85em}
