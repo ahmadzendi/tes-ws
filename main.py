@@ -728,20 +728,19 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 @keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
 #tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
 .dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
+
+/* Bottom Section */
 .bottom-section{display:flex;flex-direction:row;gap:20px;margin-top:20px;margin-bottom:60px}
-.calendar-box{flex:1;min-width:0}
-.calendar-box h3{margin:0 0 10px}
-.calendar-card{border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fff}
-.dark-mode .calendar-card{border-color:#444;background:#23272b}
-.calendar-scroll{width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
-.calendar-scroll::-webkit-scrollbar{height:8px}
-.calendar-scroll::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px}
-.calendar-scroll::-webkit-scrollbar-thumb{background:#888;border-radius:4px}
-.calendar-scroll::-webkit-scrollbar-thumb:hover{background:#555}
-.dark-mode .calendar-scroll::-webkit-scrollbar-track{background:#2a2e32}
-.dark-mode .calendar-scroll::-webkit-scrollbar-thumb{background:#555}
-.calendar-inner{min-width:750px;height:450px}
-.calendar-inner iframe{border:0;width:100%;height:100%;display:block}
+
+/* Calendar - dari kode 2 */
+.calendar-section{flex:1;min-width:0}
+.calendar-section h3{margin:0 0 10px}
+.card-calendar{width:100%;max-width:750px;height:460px;overflow:hidden;display:flex;flex-direction:column;border:1px solid #ccc;border-radius:6px;padding:10px}
+.dark-mode .card-calendar{background:#23272b;border-color:#444}
+.calendar-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1}
+.calendar-iframe{border:0;width:100%;height:420px;min-width:700px;display:block}
+
+/* Calculator */
 .calc-box{width:300px;flex-shrink:0}
 .calc-box h3{margin:0 0 10px;font-size:1.1em}
 .calc-cards{display:flex;flex-direction:column;gap:12px}
@@ -763,6 +762,8 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 3px rgba(255,179,0,0.15)}
 .calc-input-group input::placeholder{color:#999}
 .dark-mode .calc-input-group input::placeholder{color:#666}
+
+/* Tablet landscape */
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -794,12 +795,17 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .chart-header h3{font-size:1em}
 .limit-label{font-size:0.9em}
 .limit-label .limit-num{font-size:1.05em;padding:2px 7px}
+/* Bottom section tablet */
 .bottom-section{flex-direction:column;gap:20px}
+.calendar-section{width:100%}
+.card-calendar{max-width:100%;height:auto}
+.calendar-iframe{height:400px;min-width:680px}
 .calc-box{width:100%}
 .calc-cards{flex-direction:row;gap:15px}
 .calc-cards .card-calc{flex:1}
-.calendar-inner{min-width:700px;height:420px}
 }
+
+/* Tablet portrait / Large phone */
 @media(min-width:576px) and (max-width:767px){
 body{padding:12px;padding-bottom:50px}
 h2{font-size:1.05em}
@@ -831,14 +837,19 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .chart-header{flex-direction:row;gap:8px}
 .chart-header h3{font-size:0.95em}
 .limit-label{font-size:0.85em}
+/* Bottom section */
 .bottom-section{flex-direction:column;gap:18px;margin-bottom:55px}
-.calendar-box{width:100%}
+.calendar-section{width:100%}
+.card-calendar{max-width:100%;height:auto;padding:8px}
+.calendar-wrap{margin:0}
+.calendar-iframe{height:380px;min-width:620px}
 .calc-box{width:100%}
 .calc-cards{flex-direction:row;gap:12px}
 .calc-cards .card-calc{flex:1;padding:12px}
-.calendar-inner{min-width:650px;height:400px}
-.calendar-box h3,.calc-box h3{font-size:1em}
+.calendar-section h3,.calc-box h3{font-size:1em}
 }
+
+/* Medium phone */
 @media(min-width:480px) and (max-width:575px){
 body{padding:10px;padding-bottom:48px}
 h2{font-size:1em}
@@ -874,8 +885,11 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .chart-header h3{font-size:0.9em}
 .limit-label{font-size:0.82em}
 .limit-label .limit-num{font-size:1em;padding:1px 6px}
+/* Bottom section */
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
-.calendar-box{width:100%}
+.calendar-section{width:100%}
+.card-calendar{max-width:100%;height:auto;padding:6px}
+.calendar-iframe{height:360px;min-width:580px}
 .calc-box{width:100%}
 .calc-cards{flex-direction:row;gap:10px}
 .calc-cards .card-calc{flex:1;padding:10px}
@@ -884,9 +898,10 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .calc-input-group{margin-bottom:10px}
 .calc-input-group label{font-size:0.8em}
 .calc-input-group input{padding:10px;font-size:0.95em}
-.calendar-inner{min-width:600px;height:380px}
-.calendar-box h3,.calc-box h3{font-size:1em}
+.calendar-section h3,.calc-box h3{font-size:1em}
 }
+
+/* Small phone */
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
 h2{font-size:0.9em}
@@ -922,8 +937,11 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .chart-header h3{font-size:0.85em}
 .limit-label{font-size:0.78em}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
+/* Bottom section */
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:48px}
-.calendar-box{width:100%}
+.calendar-section{width:100%}
+.card-calendar{max-width:100%;height:auto;padding:5px}
+.calendar-iframe{height:340px;min-width:550px}
 .calc-box{width:100%}
 .calc-cards{flex-direction:column;gap:10px}
 .calc-cards .card-calc{width:100%;padding:10px}
@@ -932,8 +950,7 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .calc-input-group{margin-bottom:8px}
 .calc-input-group label{font-size:0.78em;margin-bottom:4px}
 .calc-input-group input{padding:10px;font-size:0.9em;border-radius:5px}
-.calendar-inner{min-width:520px;height:350px}
-.calendar-box h3,.calc-box h3{font-size:0.95em}
+.calendar-section h3,.calc-box h3{font-size:0.95em}
 }
 </style>
 </head>
@@ -982,13 +999,11 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 </div>
 <div class="bottom-section">
-<div class="calendar-box">
+<div class="calendar-section">
 <h3>📅 Kalender Ekonomi</h3>
-<div class="calendar-card">
-<div class="calendar-scroll">
-<div class="calendar-inner">
-<iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
-</div>
+<div class="card card-calendar">
+<div class="calendar-wrap">
+<iframe class="calendar-iframe" src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
 </div>
 </div>
 </div>
@@ -1041,6 +1056,7 @@ var blinkTimeout=null;
 var latestBuyRate=0;
 var latestSellRate=0;
 var isCalcUpdating=false;
+
 function parseRupiahInput(str){
 if(!str)return 0;
 return parseInt(str.replace(/\./g,''),10)||0;
@@ -1071,12 +1087,14 @@ var buyIdr=document.getElementById('buyIdr');
 var buyGram=document.getElementById('buyGram');
 var sellIdr=document.getElementById('sellIdr');
 var sellGram=document.getElementById('sellGram');
+
 function onlyNumbers(e){
 var key=e.key;
 if(e.ctrlKey||e.metaKey)return;
 if(key==='Backspace'||key==='Delete'||key==='ArrowLeft'||key==='ArrowRight'||key==='Tab')return;
 if(!/^[0-9]$/.test(key)){e.preventDefault()}
 }
+
 function onlyNumbersAndComma(e){
 var key=e.key;
 var val=this.value;
@@ -1088,22 +1106,26 @@ return;
 }
 if(!/^[0-9]$/.test(key)){e.preventDefault()}
 }
+
 buyIdr.addEventListener('keypress',onlyNumbers);
 sellIdr.addEventListener('keypress',onlyNumbers);
 buyGram.addEventListener('keypress',onlyNumbersAndComma);
 sellGram.addEventListener('keypress',onlyNumbersAndComma);
+
 buyIdr.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var nums=text.replace(/\D/g,'');
 if(nums){document.execCommand('insertText',false,nums)}
 });
+
 sellIdr.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var nums=text.replace(/\D/g,'');
 if(nums){document.execCommand('insertText',false,nums)}
 });
+
 buyGram.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
@@ -1112,6 +1134,7 @@ var parts=clean.split(',');
 var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
 if(result){document.execCommand('insertText',false,result)}
 });
+
 sellGram.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
@@ -1120,6 +1143,7 @@ var parts=clean.split(',');
 var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
 if(result){document.execCommand('insertText',false,result)}
 });
+
 buyIdr.addEventListener('input',function(){
 if(isCalcUpdating)return;
 isCalcUpdating=true;
@@ -1139,6 +1163,7 @@ buyGram.value=gram>0?formatGramCalc(gram):'';
 }
 isCalcUpdating=false;
 });
+
 buyGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestBuyRate)return;
 isCalcUpdating=true;
@@ -1147,6 +1172,7 @@ var idr=gram*latestBuyRate;
 buyIdr.value=idr>0?formatRupiahCalc(idr):'';
 isCalcUpdating=false;
 });
+
 sellGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestSellRate)return;
 isCalcUpdating=true;
@@ -1155,6 +1181,7 @@ var idr=gram*latestSellRate;
 sellIdr.value=idr>0?formatRupiahCalc(idr):'';
 isCalcUpdating=false;
 });
+
 sellIdr.addEventListener('input',function(){
 if(isCalcUpdating)return;
 isCalcUpdating=true;
@@ -1176,6 +1203,7 @@ isCalcUpdating=false;
 });
 }
 setupCalcListeners();
+
 function getOrderedProfitKeys(){
 var all=['jt10','jt20','jt30','jt40','jt50'];
 var result=[profitPriority];
