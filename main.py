@@ -468,7 +468,7 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .calendar-section>h3{margin:0 0 10px}
 .calendar-calc-wrap{display:flex;gap:15px;flex-wrap:wrap}
 .card-calendar{flex:1;min-width:450px;height:420px;overflow:hidden}
-.calendar-wrap{width:100%;height:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.calendar-wrap{width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch}
 .calendar-iframe{border:0;width:100%;height:100%;min-width:700px;display:block}
 .calc-col{display:flex;flex-direction:column;gap:10px;width:300px}
 .card-calc{padding:12px}
@@ -506,6 +506,8 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 @keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
 #tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
 .dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
+
+/* Tablet Landscape & Small Desktop */
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -537,10 +539,16 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .chart-header h3{font-size:1em}
 .limit-label{font-size:0.9em}
 .limit-label .limit-num{font-size:1.05em;padding:2px 7px}
-.calendar-calc-wrap{flex-direction:row}
-.card-calendar{min-width:380px;height:400px}
-.calc-col{width:260px}
+.calendar-section{margin-top:15px;margin-bottom:55px}
+.calendar-calc-wrap{flex-direction:row;flex-wrap:wrap}
+.card-calendar{flex:1;min-width:100%;height:400px;order:1}
+.calendar-wrap{overflow:hidden}
+.calendar-iframe{transform:scale(1.15);transform-origin:0 0;width:87%;height:87%;min-width:600px}
+.calc-col{width:100%;flex-direction:row;gap:12px;order:2}
+.card-calc{flex:1}
 }
+
+/* Tablet Portrait */
 @media(min-width:576px) and (max-width:767px){
 body{padding:12px;padding-bottom:50px}
 h2{font-size:1.05em}
@@ -572,12 +580,16 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .chart-header{flex-direction:row;gap:8px}
 .chart-header h3{font-size:0.95em}
 .limit-label{font-size:0.85em}
-.calendar-calc-wrap{flex-direction:column}
+.calendar-section{margin-top:15px;margin-bottom:55px}
+.calendar-calc-wrap{flex-direction:column;gap:12px}
 .card-calendar{width:100%;min-width:0;height:380px}
-.calendar-wrap{width:100%}
+.calendar-wrap{overflow:hidden}
+.calendar-iframe{transform:scale(1.25);transform-origin:0 0;width:80%;height:80%;min-width:450px}
 .calc-col{width:100%;flex-direction:row;gap:10px}
 .card-calc{flex:1}
 }
+
+/* Large Mobile 480-575px */
 @media(min-width:480px) and (max-width:575px){
 body{padding:10px;padding-bottom:48px}
 h2{font-size:1em}
@@ -613,9 +625,12 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .limit-label .limit-num{font-size:1em;padding:1px 6px}
 #footerApp{padding:6px 0}
 .marquee-text{font-size:12px}
-.calendar-section{margin:18px 0 45px 0}
-.calendar-calc-wrap{flex-direction:column}
-.card-calendar{width:100%;min-width:0;height:360px}
+/* Calendar Large Mobile - DIPERBESAR */
+.calendar-section{margin:15px 0 50px 0}
+.calendar-calc-wrap{flex-direction:column;gap:12px}
+.card-calendar{width:100%;min-width:0;height:480px}
+.calendar-wrap{overflow:hidden;width:100%;height:100%}
+.calendar-iframe{transform:scale(1.4);transform-origin:0 0;width:72%;height:72%;min-width:320px}
 .calc-col{width:100%;flex-direction:row;gap:8px}
 .card-calc{flex:1;padding:10px}
 .calc-title{font-size:0.95em}
@@ -624,6 +639,8 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .calc-input{padding:8px 9px;font-size:0.9em}
 .calc-note{font-size:0.68em}
 }
+
+/* Small Mobile <480px */
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
 h2{font-size:0.95em}
@@ -659,9 +676,12 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
 #footerApp{padding:5px 0}
 .marquee-text{font-size:11px}
-.calendar-section{margin:15px 0 40px 0}
-.calendar-calc-wrap{flex-direction:column}
-.card-calendar{width:100%;min-width:0;height:340px}
+/* Calendar Small Mobile - DIPERBESAR MAKSIMAL */
+.calendar-section{margin:12px 0 48px 0}
+.calendar-calc-wrap{flex-direction:column;gap:10px}
+.card-calendar{width:100%;min-width:0;height:520px}
+.calendar-wrap{overflow:hidden;width:100%;height:100%}
+.calendar-iframe{transform:scale(1.6);transform-origin:0 0;width:63%;height:63%;min-width:280px}
 .calc-col{width:100%;flex-direction:column;gap:8px}
 .card-calc{width:100%;padding:10px}
 .calc-title{font-size:0.92em}
@@ -669,6 +689,12 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .calc-label{font-size:0.75em}
 .calc-input{padding:8px;font-size:0.88em}
 .calc-note{font-size:0.65em}
+}
+
+/* Extra Small Mobile <380px */
+@media(max-width:379px){
+.card-calendar{height:550px}
+.calendar-iframe{transform:scale(1.7);width:59%;height:59%;min-width:250px}
 }
 </style>
 </head>
@@ -1168,15 +1194,11 @@ async def ws_endpoint(ws: WebSocket):
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def catch_all(request: Request, path: str):
     client_ip = get_client_ip(request)
-    
     if is_ip_blocked(client_ip):
         raise HTTPException(status_code=429, detail="IP diblokir sementara")
-    
     path_lower = path.lower()
-    
     if "atur" in path_lower or "admin" in path_lower or "config" in path_lower:
-        record_failed_attempt(client_ip, weight=2)
+        record_failed(client_ip, weight=2)
         raise HTTPException(status_code=403, detail="Akses ditolak")
-    
-    record_failed_attempt(client_ip)
+    record_failed(client_ip)
     raise HTTPException(status_code=404, detail="Halaman tidak ditemukan")
