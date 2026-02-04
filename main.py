@@ -54,7 +54,6 @@ MAX_USD_HISTORY = 11
 USD_POLL_INTERVAL = 0.3
 BROADCAST_DEBOUNCE = 0.001
 MAX_CONNECTIONS = 500
-BROADCAST_CHUNK_SIZE = 100
 STATE_CACHE_TTL = 0.02
 
 SECRET_KEY = os.environ.get("ADMIN_SECRET", "indonesia")
@@ -63,7 +62,6 @@ MAX_LIMIT = 88888
 RATE_LIMIT_SECONDS = 5
 MAX_FAILED_ATTEMPTS = 5
 BLOCK_DURATION = 300
-
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX_REQUESTS = 60
 RATE_LIMIT_STRICT_MAX = 120
@@ -74,136 +72,98 @@ usd_idr_history: deque = deque(maxlen=MAX_USD_HISTORY)
 last_buy: Optional[int] = None
 shown_updates: Set[str] = set()
 limit_bulan: int = 8
-
 failed_attempts: dict = {}
 blocked_ips: dict = {}
 last_successful_call: float = 0
 
-SUSPICIOUS_PATHS = {
-    "/admin", "/login", "/wp-admin", "/phpmyadmin", "/.env", "/config",
-    "/api/admin", "/administrator", "/wp-login", "/backup", "/.git",
-    "/shell", "/cmd", "/exec", "/eval", "/system", "/passwd", "/etc",
-}
+SUSPICIOUS_PATHS = {"/admin", "/login", "/wp-admin", "/phpmyadmin", "/.env", "/config", "/api/admin", "/administrator", "/wp-login", "/backup", "/.git", "/shell", "/cmd", "/exec", "/eval", "/system", "/passwd", "/etc"}
 
 aiohttp_session: Optional["aiohttp.ClientSession"] = None
 treasury_ws: Optional[aiohttp.ClientWebSocketResponse] = None
 treasury_ws_connected: bool = False
 
-HTML_RATE_LIMITED = """<!DOCTYPE html>
-<html><head><title>429 Too Many Requests</title></head>
-<body><h1>Too Many Requests</h1><p>Silakan coba lagi nanti.</p></body></html>"""
+HTML_RATE_LIMITED = """<!DOCTYPE html><html><head><title>429</title></head><body><h1>Too Many Requests</h1></body></html>"""
 
 
 class RateLimiter:
-    __slots__ = ('_requests', '_lock', '_last_cleanup')
-    
+    __slots__ = ('_requests', '_last_cleanup')
     def __init__(self):
         self._requests: dict = {}
-        self._lock = asyncio.Lock()
         self._last_cleanup: float = 0
-    
-    def _cleanup_old_entries(self, now: float):
+    def _cleanup(self, now: float):
         if now - self._last_cleanup < 30:
             return
         cutoff = now - RATE_LIMIT_WINDOW
-        ips_to_delete = []
-        for ip, timestamps in self._requests.items():
-            self._requests[ip] = [t for t in timestamps if t > cutoff]
+        for ip in list(self._requests.keys()):
+            self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
             if not self._requests[ip]:
-                ips_to_delete.append(ip)
-        for ip in ips_to_delete:
-            del self._requests[ip]
+                del self._requests[ip]
         self._last_cleanup = now
-    
-    def check_rate_limit(self, ip: str) -> tuple:
+    def check(self, ip: str) -> tuple:
         now = time.time()
-        self._cleanup_old_entries(now)
+        self._cleanup(now)
         if ip not in self._requests:
             self._requests[ip] = []
         cutoff = now - RATE_LIMIT_WINDOW
         self._requests[ip] = [t for t in self._requests[ip] if t > cutoff]
-        request_count = len(self._requests[ip])
-        if request_count >= RATE_LIMIT_STRICT_MAX:
-            return False, request_count, "blocked"
-        if request_count >= RATE_LIMIT_MAX_REQUESTS:
-            return False, request_count, "limited"
+        count = len(self._requests[ip])
+        if count >= RATE_LIMIT_STRICT_MAX:
+            return False, count, "blocked"
+        if count >= RATE_LIMIT_MAX_REQUESTS:
+            return False, count, "limited"
         self._requests[ip].append(now)
-        return True, request_count + 1, "ok"
-
+        return True, count + 1, "ok"
 
 rate_limiter = RateLimiter()
 
 
 class StateCache:
-    __slots__ = ('_cache', '_cache_time', '_lock', '_version')
-    
+    __slots__ = ('_cache', '_cache_time', '_lock')
     def __init__(self):
         self._cache: Optional[bytes] = None
         self._cache_time: float = 0
         self._lock = asyncio.Lock()
-        self._version: int = 0
-    
     def invalidate(self):
-        self._version += 1
         self._cache = None
-    
-    async def get_state_bytes(self) -> bytes:
+    async def get(self) -> bytes:
         now = asyncio.get_event_loop().time()
         if self._cache and (now - self._cache_time) < STATE_CACHE_TTL:
             return self._cache
         async with self._lock:
             if self._cache and (now - self._cache_time) < STATE_CACHE_TTL:
                 return self._cache
-            self._cache = build_full_state_bytes()
+            self._cache = build_state_bytes()
             self._cache_time = now
             return self._cache
-
 
 state_cache = StateCache()
 
 
 class ConnectionManager:
-    __slots__ = ('_connections', '_write_lock')
-    
+    __slots__ = ('_connections',)
     def __init__(self):
         self._connections: Set[WebSocket] = set()
-        self._write_lock = asyncio.Lock()
-    
     async def connect(self, ws: WebSocket) -> bool:
         if len(self._connections) >= MAX_CONNECTIONS:
             return False
         self._connections.add(ws)
         return True
-    
     def disconnect(self, ws: WebSocket):
         self._connections.discard(ws)
-    
     @property
     def count(self) -> int:
         return len(self._connections)
-    
     async def broadcast(self, message: bytes):
         if not self._connections:
             return
-        connections = list(self._connections)
         failed = []
-        results = await asyncio.gather(
-            *[self._send_safe(ws, message) for ws in connections],
-            return_exceptions=True
-        )
-        for ws, result in zip(connections, results):
-            if result is False or isinstance(result, Exception):
+        for ws in list(self._connections):
+            try:
+                await asyncio.wait_for(ws.send_bytes(message), timeout=3.0)
+            except:
                 failed.append(ws)
         for ws in failed:
             self.disconnect(ws)
-    
-    async def _send_safe(self, ws: WebSocket, message: bytes) -> bool:
-        try:
-            await asyncio.wait_for(ws.send_bytes(message), timeout=3.0)
-            return True
-        except:
-            return False
-
 
 manager = ConnectionManager()
 
@@ -214,176 +174,112 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
-
 def is_ip_blocked(ip: str) -> bool:
     if ip in blocked_ips:
         if time.time() < blocked_ips[ip]:
             return True
         del blocked_ips[ip]
-        if ip in failed_attempts:
-            del failed_attempts[ip]
+        failed_attempts.pop(ip, None)
     return False
-
 
 def block_ip(ip: str, duration: int = BLOCK_DURATION):
     blocked_ips[ip] = time.time() + duration
 
-
-def record_failed_attempt(ip: str, weight: int = 1):
+def record_failed(ip: str, weight: int = 1):
     now = time.time()
     if ip not in failed_attempts:
         failed_attempts[ip] = []
-    for _ in range(weight):
-        failed_attempts[ip].append(now)
+    failed_attempts[ip].extend([now] * weight)
     failed_attempts[ip] = [t for t in failed_attempts[ip] if now - t < 60]
     if len(failed_attempts[ip]) >= MAX_FAILED_ATTEMPTS:
         block_ip(ip)
 
-
 def verify_secret(key: str) -> bool:
     return secrets.compare_digest(key, SECRET_KEY)
 
-
-def is_suspicious_path(path: str) -> bool:
-    path_lower = path.lower()
-    for suspicious in SUSPICIOUS_PATHS:
-        if suspicious in path_lower:
-            return True
-    return False
-
+def is_suspicious(path: str) -> bool:
+    pl = path.lower()
+    return any(s in pl for s in SUSPICIOUS_PATHS)
 
 @lru_cache(maxsize=1024)
 def format_rupiah(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
-
 @lru_cache(maxsize=512)
 def get_time_only(date_str: str) -> str:
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-        return dt.strftime('%H:%M:%S')
+        return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").strftime('%H:%M:%S')
     except:
         return date_str
 
-
-def format_waktu_only(date_str: str, status: str) -> str:
+def format_waktu(date_str: str, status: str) -> str:
     return f"{get_time_only(date_str)}{status}"
 
-
 @lru_cache(maxsize=256)
-def format_diff_display(diff: int, status: str) -> str:
+def format_diff(diff: int, status: str) -> str:
     if status == "🚀":
         return f"🚀+{format_rupiah(diff)}"
     elif status == "🔻":
         return f"🔻-{format_rupiah(abs(diff))}"
     return "➖tetap"
 
-
-PROFIT_CONFIGS = [
-    (10000000, 9669000),
-    (20000000, 19330000),
-    (30000000, 28995000),
-    (40000000, 38660000),
-    (50000000, 48325000),
-]
-
+PROFIT_CONFIGS = [(10000000, 9669000), (20000000, 19330000), (30000000, 28995000), (40000000, 38660000), (50000000, 48325000)]
 
 def calc_profit(h: dict, modal: int, pokok: int) -> str:
     try:
-        buy_rate = h["buying_rate"]
-        sell_rate = h["selling_rate"]
-        gram = modal / buy_rate
-        val = int(gram * sell_rate - pokok)
-        gram_str = f"{gram:,.4f}".replace(",", ".")
+        gram = modal / h["buying_rate"]
+        val = int(gram * h["selling_rate"] - pokok)
+        gs = f"{gram:,.4f}".replace(",", ".")
         if val > 0:
-            return f"+{format_rupiah(val)}🟢{gram_str}gr"
+            return f"+{format_rupiah(val)}🟢{gs}gr"
         elif val < 0:
-            return f"-{format_rupiah(abs(val))}🔴{gram_str}gr"
-        return f"{format_rupiah(0)}➖{gram_str}gr"
+            return f"-{format_rupiah(abs(val))}🔴{gs}gr"
+        return f"0➖{gs}gr"
     except:
         return "-"
 
-
-def build_single_history_item(h: dict) -> dict:
-    buy_fmt = format_rupiah(h["buying_rate"])
-    sell_fmt = format_rupiah(h["selling_rate"])
-    diff_display = format_diff_display(h.get("diff", 0), h["status"])
+def build_history_item(h: dict) -> dict:
+    bf = format_rupiah(h["buying_rate"])
+    sf = format_rupiah(h["selling_rate"])
+    dd = format_diff(h.get("diff", 0), h["status"])
     return {
-        "buying_rate": buy_fmt,
-        "selling_rate": sell_fmt,
-        "buying_rate_raw": h["buying_rate"],
-        "selling_rate_raw": h["selling_rate"],
-        "waktu_display": format_waktu_only(h["created_at"], h["status"]),
-        "diff_display": diff_display,
-        "created_at": h["created_at"],
-        "jt10": calc_profit(h, *PROFIT_CONFIGS[0]),
-        "jt20": calc_profit(h, *PROFIT_CONFIGS[1]),
-        "jt30": calc_profit(h, *PROFIT_CONFIGS[2]),
-        "jt40": calc_profit(h, *PROFIT_CONFIGS[3]),
+        "buying_rate": bf, "selling_rate": sf,
+        "buying_rate_raw": h["buying_rate"], "selling_rate_raw": h["selling_rate"],
+        "waktu_display": format_waktu(h["created_at"], h["status"]),
+        "diff_display": dd, "created_at": h["created_at"],
+        "jt10": calc_profit(h, *PROFIT_CONFIGS[0]), "jt20": calc_profit(h, *PROFIT_CONFIGS[1]),
+        "jt30": calc_profit(h, *PROFIT_CONFIGS[2]), "jt40": calc_profit(h, *PROFIT_CONFIGS[3]),
         "jt50": calc_profit(h, *PROFIT_CONFIGS[4]),
     }
 
-
-def build_history_data() -> List[dict]:
-    return [build_single_history_item(h) for h in history]
-
-
-def build_usd_idr_data() -> List[dict]:
-    return [{"price": h["price"], "time": h["time"]} for h in usd_idr_history]
-
-
-def build_full_state_bytes() -> bytes:
+def build_state_bytes() -> bytes:
     return json_dumps_bytes({
-        "history": build_history_data(),
-        "usd_idr_history": build_usd_idr_data(),
+        "history": [build_history_item(h) for h in history],
+        "usd_idr_history": [{"price": h["price"], "time": h["time"]} for h in usd_idr_history],
         "limit_bulan": limit_bulan
     })
 
-
-async def get_aiohttp_session() -> "aiohttp.ClientSession":
+async def get_session() -> "aiohttp.ClientSession":
     global aiohttp_session
     if aiohttp_session is None or aiohttp_session.closed:
-        timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=20)
-        connector = aiohttp.TCPConnector(
-            limit=150,
-            limit_per_host=50,
-            keepalive_timeout=120,
-            enable_cleanup_closed=True,
-            force_close=False,
-            ttl_dns_cache=300,
-        )
         aiohttp_session = aiohttp.ClientSession(
-            timeout=timeout,
-            connector=connector,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-            raise_for_status=False
+            timeout=aiohttp.ClientTimeout(total=30, connect=10),
+            connector=aiohttp.TCPConnector(limit=100, ttl_dns_cache=300),
+            headers={"User-Agent": "Mozilla/5.0"}
         )
     return aiohttp_session
 
-
-async def close_aiohttp_session():
+async def close_session():
     global aiohttp_session, treasury_ws
     if treasury_ws and not treasury_ws.closed:
         await treasury_ws.close()
-        treasury_ws = None
     if aiohttp_session and not aiohttp_session.closed:
         await aiohttp_session.close()
-        await asyncio.sleep(0.1)
-        aiohttp_session = None
 
-
-_google_headers = {"Accept": "text/html,application/xhtml+xml"}
-_google_cookies = {"CONSENT": "YES+cb.20231208-04-p0.en+FX+410"}
-
-
-async def fetch_usd_idr_price() -> Optional[str]:
+async def fetch_usd_idr() -> Optional[str]:
     try:
-        session = await get_aiohttp_session()
-        async with session.get(
-            "https://www.google.com/finance/quote/USD-IDR",
-            headers=_google_headers,
-            cookies=_google_cookies
-        ) as resp:
+        session = await get_session()
+        async with session.get("https://www.google.com/finance/quote/USD-IDR", headers={"Accept": "text/html"}, cookies={"CONSENT": "YES+"}) as resp:
             if resp.status == 200:
                 text = await resp.text()
                 if USE_LXML:
@@ -401,15 +297,12 @@ async def fetch_usd_idr_price() -> Optional[str]:
     return None
 
 
-class BroadcastDebouncer:
-    __slots__ = ('_pending', '_lock', '_last_broadcast')
-    
+class Debouncer:
+    __slots__ = ('_pending', '_lock')
     def __init__(self):
         self._pending = False
         self._lock = asyncio.Lock()
-        self._last_broadcast: float = 0
-    
-    async def schedule_broadcast(self):
+    async def schedule(self):
         async with self._lock:
             if self._pending:
                 return
@@ -418,162 +311,87 @@ class BroadcastDebouncer:
         await asyncio.sleep(BROADCAST_DEBOUNCE)
         async with self._lock:
             self._pending = False
-        message = await state_cache.get_state_bytes()
-        await manager.broadcast(message)
-        self._last_broadcast = asyncio.get_event_loop().time()
-    
-    async def broadcast_immediate(self):
+        await manager.broadcast(await state_cache.get())
+    async def immediate(self):
         state_cache.invalidate()
-        message = await state_cache.get_state_bytes()
-        await manager.broadcast(message)
-        self._last_broadcast = asyncio.get_event_loop().time()
+        await manager.broadcast(await state_cache.get())
 
-
-debouncer = BroadcastDebouncer()
-
-TREASURY_WS_URL = "wss://ws-ap1.pusher.com/app/52e99bd2c3c42e577e13?protocol=7&client=js&version=7.0.3&flash=false"
-TREASURY_CHANNEL = "gold-rate"
-TREASURY_EVENT = "gold-rate-event"
-
+debouncer = Debouncer()
 
 def parse_number(value) -> int:
     if isinstance(value, str):
         return int(value.replace(".", "").replace(",", ""))
     return int(float(value))
 
-
-async def process_treasury_data(data: dict):
+async def process_treasury(data: dict):
     global last_buy, shown_updates
     try:
-        buy = data.get("buying_rate")
-        sell = data.get("selling_rate")
-        upd = data.get("created_at")
+        buy, sell, upd = data.get("buying_rate"), data.get("selling_rate"), data.get("created_at")
         if buy and sell and upd and upd not in shown_updates:
-            buy = parse_number(buy)
-            sell = parse_number(sell)
+            buy, sell = parse_number(buy), parse_number(sell)
             diff = 0 if last_buy is None else buy - last_buy
-            if last_buy is None:
-                status = "➖"
-            elif buy > last_buy:
-                status = "🚀"
-            elif buy < last_buy:
-                status = "🔻"
-            else:
-                status = "➖"
-            history.append({
-                "buying_rate": buy,
-                "selling_rate": sell,
-                "status": status,
-                "diff": diff,
-                "created_at": upd
-            })
+            status = "➖" if last_buy is None else ("🚀" if buy > last_buy else ("🔻" if buy < last_buy else "➖"))
+            history.append({"buying_rate": buy, "selling_rate": sell, "status": status, "diff": diff, "created_at": upd})
             last_buy = buy
             shown_updates.add(upd)
             if len(shown_updates) > 5000:
                 shown_updates = {upd}
-            await debouncer.broadcast_immediate()
+            await debouncer.immediate()
     except Exception as e:
-        print(f"Error processing treasury data: {e}")
+        print(f"Error: {e}")
 
-
-async def treasury_ws_loop():
+async def treasury_loop():
     global treasury_ws, treasury_ws_connected
-    consecutive_errors = 0
+    errors = 0
     while True:
         try:
-            session = await get_aiohttp_session()
-            async with session.ws_connect(
-                TREASURY_WS_URL,
-                heartbeat=20,
-                receive_timeout=45
-            ) as ws:
-                treasury_ws = ws
-                treasury_ws_connected = True
-                consecutive_errors = 0
-                print("Treasury WebSocket connected")
-                subscribe_msg = {
-                    "event": "pusher:subscribe",
-                    "data": {"channel": TREASURY_CHANNEL}
-                }
-                await ws.send_str(json_dumps(subscribe_msg))
-                print(f"Subscribed to channel: {TREASURY_CHANNEL}")
+            session = await get_session()
+            async with session.ws_connect("wss://ws-ap1.pusher.com/app/52e99bd2c3c42e577e13?protocol=7&client=js&version=7.0.3", heartbeat=20, receive_timeout=45) as ws:
+                treasury_ws, treasury_ws_connected, errors = ws, True, 0
+                await ws.send_str(json_dumps({"event": "pusher:subscribe", "data": {"channel": "gold-rate"}}))
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
-                        try:
-                            message = json_loads(msg.data)
-                            event = message.get("event", "")
-                            if event == TREASURY_EVENT:
-                                data_str = message.get("data", "{}")
-                                if isinstance(data_str, str):
-                                    data = json_loads(data_str)
-                                else:
-                                    data = data_str
-                                await process_treasury_data(data)
-                            elif event == "pusher:connection_established":
-                                print("Pusher connection established")
-                            elif event == "pusher_internal:subscription_succeeded":
-                                print(f"Subscription succeeded for channel: {message.get('channel')}")
-                            elif event == "pusher:error":
-                                print(f"Pusher error: {message.get('data')}")
-                        except Exception as e:
-                            print(f"Error parsing message: {e}")
-                    elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        print("Treasury WebSocket closed by server")
-                        break
-                    elif msg.type == aiohttp.WSMsgType.ERROR:
-                        print(f"Treasury WebSocket error: {ws.exception()}")
+                        m = json_loads(msg.data)
+                        if m.get("event") == "gold-rate-event":
+                            d = m.get("data", "{}")
+                            await process_treasury(json_loads(d) if isinstance(d, str) else d)
+                    elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                         break
         except asyncio.CancelledError:
-            print("Treasury WebSocket loop cancelled")
             break
         except Exception as e:
-            consecutive_errors += 1
-            print(f"Treasury WebSocket error (attempt {consecutive_errors}): {e}")
+            errors += 1
+            print(f"Treasury error: {e}")
         finally:
             treasury_ws_connected = False
-            treasury_ws = None
-        wait_time = min(1 * consecutive_errors, 15)
-        print(f"Reconnecting Treasury WebSocket in {wait_time} seconds...")
-        await asyncio.sleep(wait_time)
+        await asyncio.sleep(min(errors, 15))
 
-
-async def usd_idr_loop():
+async def usd_loop():
     while True:
         try:
-            price = await fetch_usd_idr_price()
-            if price:
-                should_update = (
-                    not usd_idr_history or 
-                    usd_idr_history[-1]["price"] != price
-                )
-                if should_update:
-                    wib = datetime.utcnow() + timedelta(hours=7)
-                    usd_idr_history.append({
-                        "price": price, 
-                        "time": wib.strftime("%H:%M:%S")
-                    })
-                    asyncio.create_task(debouncer.schedule_broadcast())
+            price = await fetch_usd_idr()
+            if price and (not usd_idr_history or usd_idr_history[-1]["price"] != price):
+                usd_idr_history.append({"price": price, "time": (datetime.utcnow() + timedelta(hours=7)).strftime("%H:%M:%S")})
+                asyncio.create_task(debouncer.schedule())
             await asyncio.sleep(USD_POLL_INTERVAL)
         except asyncio.CancelledError:
             break
         except:
-            await asyncio.sleep(1.0)
-
+            await asyncio.sleep(1)
 
 async def heartbeat_loop():
-    ping_msg = b'{"ping":true}'
     while True:
         try:
-            await asyncio.sleep(15.0)
+            await asyncio.sleep(15)
             if manager.count > 0:
-                await manager.broadcast(ping_msg)
+                await manager.broadcast(b'{"ping":true}')
         except asyncio.CancelledError:
             break
         except:
             pass
 
 
-HTML_TEMPLATE = r"""<!DOCTYPE html>
+HTML_TEMPLATE = r'''<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -615,10 +433,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .card{border:1px solid #ccc;border-radius:6px;padding:10px}
 .card-usd{width:248px;height:370px;overflow-y:auto}
 .card-chart{flex:1;min-width:400px;height:370px;overflow:hidden}
-.card-calendar{flex:1;min-width:400px;height:460px;overflow:hidden;display:flex;flex-direction:column}
-.card-calc-buy{width:320px;padding:15px}
-.card-calc-sell{width:320px;padding:15px}
-.calc-wrap{display:flex;flex-direction:column;gap:0}
 #priceList{list-style:none;padding:0;margin:0;max-height:275px;overflow-y:auto}
 #priceList li{margin-bottom:1px}
 .time{color:gray;font-size:.9em;margin-left:10px}
@@ -634,10 +448,11 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .dataTables_wrapper{position:relative}
 .dt-top-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:0!important;padding:8px 0;padding-bottom:0!important}
-.dataTables_wrapper .dataTables_length{margin:0!important;float:none!important}
+.dataTables_wrapper .dataTables_length{margin:0!important;float:none!important;margin-bottom:0!important;padding-bottom:0!important}
 .dataTables_wrapper .dataTables_filter{margin:0!important;float:none!important}
 .dataTables_wrapper .dataTables_info{display:none!important}
 .dataTables_wrapper .dataTables_paginate{margin-top:10px!important;text-align:center!important}
+.tbl-wrap{margin-top:0!important;padding-top:0!important}
 #tabel.dataTable{margin-top:0!important}
 #tabel tbody td.transaksi{padding:6px 8px;white-space:nowrap}
 .profit-order-btns{display:none;gap:3px;align-items:center;margin-right:6px}
@@ -650,10 +465,31 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .filter-wrap{display:flex;align-items:center}
 .tradingview-wrapper{height:100%;width:100%;overflow:hidden}
 .calendar-section{width:100%;margin-top:20px;margin-bottom:60px}
-.calendar-section h3{margin:0 0 10px}
+.calendar-section>h3{margin:0 0 10px}
 .calendar-calc-wrap{display:flex;gap:15px;flex-wrap:wrap}
-.calendar-wrap{flex:1;min-width:500px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.calendar-iframe{border:0;width:100%;height:420px;min-width:700px;display:block}
+.card-calendar{flex:1;min-width:450px;height:420px;overflow:hidden}
+.calendar-wrap{width:100%;height:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.calendar-iframe{border:0;width:100%;height:100%;min-width:700px;display:block}
+.calc-col{display:flex;flex-direction:column;gap:10px;width:300px}
+.card-calc{padding:12px}
+.calc-title{font-size:1.05em;font-weight:bold;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #28a745;display:flex;align-items:center;gap:8px;color:#28a745}
+.calc-title.sell-title{border-color:#dc3545;color:#dc3545}
+.dark-mode .calc-title{color:#4caf50}
+.dark-mode .calc-title.sell-title{color:#f44336}
+.calc-icon{font-size:1.15em}
+.calc-rate{font-size:0.82em;color:#666;margin-bottom:10px;padding:6px 10px;background:#f5f5f5;border-radius:4px}
+.dark-mode .calc-rate{background:#2a2a2a;color:#aaa}
+.calc-row{margin-bottom:10px}
+.calc-label{font-size:0.82em;color:#555;margin-bottom:4px;font-weight:500}
+.dark-mode .calc-label{color:#bbb}
+.calc-input{width:100%;padding:9px 11px;border:2px solid #ddd;border-radius:6px;font-size:0.95em;transition:border-color .2s,box-shadow .2s}
+.calc-input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 3px rgba(0,123,255,0.15)}
+.calc-input.buy-input:focus{border-color:#28a745;box-shadow:0 0 0 3px rgba(40,167,69,0.15)}
+.calc-input.sell-input:focus{border-color:#dc3545;box-shadow:0 0 0 3px rgba(220,53,69,0.15)}
+.dark-mode .calc-input{background:#2a2a2a;border-color:#444;color:#e0e0e0}
+.dark-mode .calc-input:focus{border-color:#29b6f6}
+.calc-note{font-size:0.72em;color:#888;margin-top:6px;font-style:italic}
+.dark-mode .calc-note{color:#666}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-top:0;margin-bottom:10px}
 .chart-header h3{margin:0}
 .limit-label{font-size:0.95em;font-weight:bold;color:#ff1744}
@@ -670,25 +506,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 @keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
 #tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
 .dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
-.calc-title{font-size:1.1em;font-weight:bold;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #007bff;display:flex;align-items:center;gap:8px}
-.calc-title.buy-title{border-color:#28a745;color:#28a745}
-.calc-title.sell-title{border-color:#dc3545;color:#dc3545}
-.dark-mode .calc-title.buy-title{color:#4caf50}
-.dark-mode .calc-title.sell-title{color:#f44336}
-.calc-rate{font-size:0.85em;color:#666;margin-bottom:12px;padding:8px 10px;background:#f5f5f5;border-radius:4px}
-.dark-mode .calc-rate{background:#2a2a2a;color:#aaa}
-.calc-row{margin-bottom:12px}
-.calc-label{font-size:0.85em;color:#555;margin-bottom:4px;font-weight:500}
-.dark-mode .calc-label{color:#bbb}
-.calc-input{width:100%;padding:10px 12px;border:2px solid #ddd;border-radius:6px;font-size:1em;transition:border-color .2s,box-shadow .2s}
-.calc-input:focus{outline:none;border-color:#007bff;box-shadow:0 0 0 3px rgba(0,123,255,0.15)}
-.calc-input.buy-input:focus{border-color:#28a745;box-shadow:0 0 0 3px rgba(40,167,69,0.15)}
-.calc-input.sell-input:focus{border-color:#dc3545;box-shadow:0 0 0 3px rgba(220,53,69,0.15)}
-.dark-mode .calc-input{background:#2a2a2a;border-color:#444;color:#e0e0e0}
-.dark-mode .calc-input:focus{border-color:#29b6f6}
-.calc-icon{font-size:1.2em}
-.calc-note{font-size:0.75em;color:#888;margin-top:8px;font-style:italic}
-.dark-mode .calc-note{color:#666}
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -702,11 +519,6 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .container-flex{flex-direction:row;gap:15px}
 .card-usd{width:220px;height:350px}
 .card-chart{flex:1;min-width:350px;height:350px}
-.card-calendar{max-width:100%;height:auto;min-width:300px}
-.card-calc-buy,.card-calc-sell{width:260px}
-.calendar-iframe{height:400px;min-width:680px}
-.calendar-calc-wrap{flex-direction:row}
-.calendar-wrap{min-width:400px}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:8px;margin-bottom:8px;padding:6px 0}
 .dataTables_wrapper .dataTables_length{font-size:14px!important}
 .dataTables_wrapper .dataTables_filter{font-size:14px!important}
@@ -725,6 +537,9 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .chart-header h3{font-size:1em}
 .limit-label{font-size:0.9em}
 .limit-label .limit-num{font-size:1.05em;padding:2px 7px}
+.calendar-calc-wrap{flex-direction:row}
+.card-calendar{min-width:380px;height:400px}
+.calc-col{width:260px}
 }
 @media(min-width:576px) and (max-width:767px){
 body{padding:12px;padding-bottom:50px}
@@ -740,13 +555,6 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
 .card-usd{height:auto;min-height:300px}
 .card-chart{height:360px}
-.card-calendar{max-width:100%;height:auto;padding:0;min-width:0}
-.card-calc-buy,.card-calc-sell{width:100%}
-.calendar-section{margin-bottom:50px}
-.calendar-calc-wrap{flex-direction:column}
-.calc-wrap{flex-direction:column}
-.calendar-wrap{margin:0 -12px;padding:0 12px;width:calc(100% + 24px);min-width:0}
-.calendar-iframe{height:380px;min-width:620px}
 .dt-top-controls{flex-direction:row;justify-content:space-between;gap:5px;margin-bottom:8px;padding:5px 0}
 .dataTables_wrapper .dataTables_length{font-size:13px!important}
 .dataTables_wrapper .dataTables_filter{font-size:13px!important}
@@ -764,6 +572,11 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .chart-header{flex-direction:row;gap:8px}
 .chart-header h3{font-size:0.95em}
 .limit-label{font-size:0.85em}
+.calendar-calc-wrap{flex-direction:column}
+.card-calendar{width:100%;min-width:0;height:380px}
+.calendar-wrap{width:100%}
+.calc-col{width:100%;flex-direction:row;gap:10px}
+.card-calc{flex:1}
 }
 @media(min-width:480px) and (max-width:575px){
 body{padding:10px;padding-bottom:48px}
@@ -781,15 +594,6 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .card-usd{height:auto;min-height:280px}
 .card-chart{height:340px}
 .card{padding:8px}
-.card-calendar{height:auto;padding:0;min-width:0}
-.card-calc-buy,.card-calc-sell{width:100%}
-.calendar-section{margin:18px 0 45px 0}
-.calendar-calc-wrap{flex-direction:column}
-.calc-wrap{flex-direction:column}
-.calendar-wrap{margin:0 -10px;padding:0 10px;width:calc(100% + 20px);min-width:0}
-.calendar-iframe{height:360px;min-width:580px}
-#footerApp{padding:6px 0}
-.marquee-text{font-size:12px}
 .dt-top-controls{gap:4px;margin-bottom:6px}
 .dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:12px!important}
 .dataTables_wrapper .dataTables_filter input{width:75px!important;font-size:12px!important}
@@ -807,6 +611,18 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .chart-header h3{font-size:0.9em}
 .limit-label{font-size:0.82em}
 .limit-label .limit-num{font-size:1em;padding:1px 6px}
+#footerApp{padding:6px 0}
+.marquee-text{font-size:12px}
+.calendar-section{margin:18px 0 45px 0}
+.calendar-calc-wrap{flex-direction:column}
+.card-calendar{width:100%;min-width:0;height:360px}
+.calc-col{width:100%;flex-direction:row;gap:8px}
+.card-calc{flex:1;padding:10px}
+.calc-title{font-size:0.95em}
+.calc-rate{font-size:0.78em}
+.calc-label{font-size:0.78em}
+.calc-input{padding:8px 9px;font-size:0.9em}
+.calc-note{font-size:0.68em}
 }
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
@@ -824,15 +640,6 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .card-usd{height:auto;min-height:260px}
 .card-chart{height:320px}
 .card{padding:6px}
-.card-calendar{height:auto;padding:0;min-width:0}
-.card-calc-buy,.card-calc-sell{width:100%}
-.calendar-section{margin:15px 0 40px 0}
-.calendar-calc-wrap{flex-direction:column}
-.calc-wrap{flex-direction:column}
-.calendar-wrap{margin:0 -8px;padding:0 8px;width:calc(100% + 16px);min-width:0}
-.calendar-iframe{height:340px;min-width:550px}
-#footerApp{padding:5px 0}
-.marquee-text{font-size:11px}
 .dt-top-controls{gap:3px;margin-bottom:5px}
 .dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:11px!important}
 .dataTables_wrapper .dataTables_filter input{width:60px!important;font-size:11px!important}
@@ -850,6 +657,18 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .chart-header h3{font-size:0.85em}
 .limit-label{font-size:0.78em}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
+#footerApp{padding:5px 0}
+.marquee-text{font-size:11px}
+.calendar-section{margin:15px 0 40px 0}
+.calendar-calc-wrap{flex-direction:column}
+.card-calendar{width:100%;min-width:0;height:340px}
+.calc-col{width:100%;flex-direction:column;gap:8px}
+.card-calc{width:100%;padding:10px}
+.calc-title{font-size:0.92em}
+.calc-rate{font-size:0.75em}
+.calc-label{font-size:0.75em}
+.calc-input{padding:8px;font-size:0.88em}
+.calc-note{font-size:0.65em}
 }
 </style>
 </head>
@@ -905,9 +724,9 @@ h3{font-size:0.88em;margin:10px 0 6px}
 <iframe class="calendar-iframe" src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_centralBanks,_confidenceIndex&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,37,48,35,17,36,26,12,72&calType=week&timeZone=27&lang=54" loading="lazy"></iframe>
 </div>
 </div>
-<div class="calc-wrap">
-<div class="card card-calc-buy">
-<div class="calc-title buy-title"><span class="calc-icon">💰</span> Kalkulator Tumbas Emas</div>
+<div class="calc-col">
+<div class="card card-calc">
+<div class="calc-title"><span class="calc-icon">💰</span> Kalkulator Tumbas Emas</div>
 <div class="calc-rate">Harga Beli: <strong id="calcBuyRate">-</strong> /gram</div>
 <div class="calc-row">
 <div class="calc-label">Masukkan Rupiah (IDR)</div>
@@ -919,8 +738,8 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 <p class="calc-note">*Berdasarkan harga beli terakhir Treasury</p>
 </div>
-<div class="card card-calc-sell">
-<div class="calc-title sell-title"><span class="calc-icon">💸</span> Kalkulator Jual Emas</div>
+<div class="card card-calc">
+<div class="calc-title sell-title"><span class="calc-icon">💸</span> Kalkulator JUAL Emas</div>
 <div class="calc-rate">Harga Jual: <strong id="calcSellRate">-</strong> /gram</div>
 <div class="calc-row">
 <div class="calc-label">Masukkan Gram Emas</div>
@@ -935,7 +754,7 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 </div>
 </div>
-<footer id="footerApp"><span class="marquee-text">&copy;2026 ~ahmadkholil~</span></footer>
+<footer id="footerApp"><span class="marquee-text">©2026 ~ahmadkholil~</span></footer>
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://s3.tradingview.com/tv.js"></script>
@@ -1108,7 +927,7 @@ updateTableHeaders();
 function getTopRowId(h){
 if(!h||!h.length)return'';
 var sorted=h.slice().sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
-return sorted[0].created_at+'|'+sorted[0].buying_rate;
+return sorted[0].created_at+'|'+sorted[0].buying_rate_raw;
 }
 function triggerBlinkEffect(){
 if(blinkTimeout){clearTimeout(blinkTimeout)}
@@ -1251,113 +1070,87 @@ setTimeout(createTradingViewWidget,100);
 })();
 </script>
 </body>
-</html>"""
+</html>'''
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [
-        asyncio.create_task(treasury_ws_loop()),
-        asyncio.create_task(usd_idr_loop()),
-        asyncio.create_task(heartbeat_loop())
-    ]
+    tasks = [asyncio.create_task(treasury_loop()), asyncio.create_task(usd_loop()), asyncio.create_task(heartbeat_loop())]
     yield
     for t in tasks:
         t.cancel()
-    await close_aiohttp_session()
+    await close_session()
     await asyncio.gather(*tasks, return_exceptions=True)
 
-
-app = FastAPI(title="Gold Monitor", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-
 @app.middleware("http")
-async def security_middleware(request: Request, call_next):
-    client_ip = get_client_ip(request)
+async def security(request: Request, call_next):
+    ip = get_client_ip(request)
     path = request.url.path
-    path_lower = path.lower()
-    if is_ip_blocked(client_ip):
-        return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html")
+    if is_ip_blocked(ip):
+        return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
     if path not in RATE_LIMIT_WHITELIST:
-        allowed, count, status = rate_limiter.check_rate_limit(client_ip)
+        ok, _, status = rate_limiter.check(ip)
         if status == "blocked":
-            block_ip(client_ip, 600)
-            return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html")
-        if not allowed:
-            return Response(content=HTML_RATE_LIMITED,status_code=429,media_type="text/html",headers={"Retry-After": "60"})
-    if is_suspicious_path(path_lower):
-        record_failed_attempt(client_ip, weight=3)
+            block_ip(ip, 600)
+            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html")
+        if not ok:
+            return Response(content=HTML_RATE_LIMITED, status_code=429, media_type="text/html", headers={"Retry-After": "60"})
+    if is_suspicious(path):
+        record_failed(ip, 3)
         return Response(content='{"error":"forbidden"}', status_code=403, media_type="application/json")
-    if path_lower.startswith("/aturts") and path_lower != "/aturts" and not path_lower.startswith("/aturts/"):
-        record_failed_attempt(client_ip, weight=2)
-        return Response(content='{"error":"invalid"}', status_code=400, media_type="application/json")
     return await call_next(request)
-
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return HTMLResponse(content=HTML_TEMPLATE)
 
-
 @app.get("/api/state")
-async def get_state():
-    return Response(content=await state_cache.get_state_bytes(),media_type="application/json")
-
-
-@app.get("/aturTS")
-@app.get("/aturTS/")
-async def atur_ts_no_value(request: Request):
-    client_ip = get_client_ip(request)
-    if is_ip_blocked(client_ip):
-        raise HTTPException(status_code=429, detail="IP diblokir sementara")
-    record_failed_attempt(client_ip)
-    raise HTTPException(status_code=400, detail="Parameter tidak lengkap")
-
+async def api_state():
+    return Response(content=await state_cache.get(), media_type="application/json")
 
 @app.get("/aturTS/{value}")
-async def set_limit_ts(request: Request,value: str = Path(...),key: str = Query(None)):
+async def set_limit(request: Request, value: str = Path(...), key: str = Query(None)):
     global limit_bulan, last_successful_call
-    client_ip = get_client_ip(request)
-    if is_ip_blocked(client_ip):
-        raise HTTPException(status_code=429, detail="IP diblokir sementara")
-    if key is None:
-        record_failed_attempt(client_ip, weight=2)
-        raise HTTPException(status_code=400, detail="Parameter key diperlukan")
+    ip = get_client_ip(request)
+    if is_ip_blocked(ip):
+        raise HTTPException(429, "Blocked")
+    if not key:
+        record_failed(ip, 2)
+        raise HTTPException(400, "Key required")
     if not verify_secret(key):
-        record_failed_attempt(client_ip)
-        raise HTTPException(status_code=403, detail="Akses ditolak")
+        record_failed(ip)
+        raise HTTPException(403, "Forbidden")
     try:
-        int_value = int(value)
-    except (ValueError, TypeError):
-        record_failed_attempt(client_ip)
-        raise HTTPException(status_code=400, detail="Nilai harus berupa angka")
+        v = int(value)
+    except:
+        record_failed(ip)
+        raise HTTPException(400, "Invalid")
     now = time.time()
     if now - last_successful_call < RATE_LIMIT_SECONDS:
-        raise HTTPException(status_code=429, detail="Terlalu cepat, tunggu beberapa detik")
-    if not MIN_LIMIT <= int_value <= MAX_LIMIT:
-        raise HTTPException(status_code=400, detail=f"Nilai harus {MIN_LIMIT}-{MAX_LIMIT}")
-    limit_bulan = int_value
+        raise HTTPException(429, "Too fast")
+    if not MIN_LIMIT <= v <= MAX_LIMIT:
+        raise HTTPException(400, f"Range {MIN_LIMIT}-{MAX_LIMIT}")
+    limit_bulan = v
     last_successful_call = now
     state_cache.invalidate()
-    asyncio.create_task(debouncer.schedule_broadcast())
+    asyncio.create_task(debouncer.schedule())
     return {"status": "ok", "limit_bulan": limit_bulan}
 
-
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     if not await manager.connect(ws):
-        await ws.close(code=1013, reason="Too many connections")
+        await ws.close(1013, "Too many")
         return
     try:
-        initial_data = await state_cache.get_state_bytes()
-        await ws.send_bytes(initial_data)
+        await ws.send_bytes(await state_cache.get())
         while True:
             try:
-                data = await asyncio.wait_for(ws.receive(), timeout=45.0)
-                msg_type = data.get("type")
-                if msg_type == "websocket.disconnect":
+                data = await asyncio.wait_for(ws.receive(), timeout=45)
+                if data.get("type") == "websocket.disconnect":
                     break
                 if data.get("text") == "ping" or data.get("bytes") == b"ping":
                     await ws.send_bytes(b'{"pong":true}')
@@ -1366,9 +1159,7 @@ async def websocket_endpoint(ws: WebSocket):
                     await ws.send_bytes(b'{"ping":true}')
                 except:
                     break
-    except WebSocketDisconnect:
-        pass
-    except Exception:
+    except:
         pass
     finally:
         manager.disconnect(ws)
@@ -1389,20 +1180,3 @@ async def catch_all(request: Request, path: str):
     
     record_failed_attempt(client_ip)
     raise HTTPException(status_code=404, detail="Halaman tidak ditemukan")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        log_level="warning",
-        access_log=False,
-        ws_ping_interval=20,
-        ws_ping_timeout=20,
-        limit_concurrency=500,
-        backlog=256,
-        timeout_keep_alive=30,
-    )
