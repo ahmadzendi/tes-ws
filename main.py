@@ -639,8 +639,8 @@ async def heartbeat_loop():
         except:
             pass
 
-
 HTML_TEMPLATE = r"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -728,8 +728,7 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 @keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
 #tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
 .dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
-
-.bottom-section{display:flex;gap:20px;margin-top:20px;margin-bottom:60px}
+.bottom-section{display:flex;flex-direction:row;gap:20px;margin-top:20px;margin-bottom:60px}
 .calendar-box{flex:1;min-width:0}
 .calendar-box h3{margin:0 0 10px}
 .calendar-card{border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fff}
@@ -743,7 +742,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .calendar-scroll::-webkit-scrollbar-thumb{background:#555}
 .calendar-inner{min-width:750px;height:450px}
 .calendar-inner iframe{border:0;width:100%;height:100%;display:block}
-
 .calc-box{width:300px;flex-shrink:0}
 .calc-box h3{margin:0 0 10px;font-size:1.1em}
 .calc-cards{display:flex;flex-direction:column;gap:12px}
@@ -765,37 +763,122 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 3px rgba(255,179,0,0.15)}
 .calc-input-group input::placeholder{color:#999}
 .dark-mode .calc-input-group input::placeholder{color:#666}
-
-@media(max-width:1024px){
+@media(min-width:768px) and (max-width:1024px){
+body{padding:15px;padding-bottom:50px}
+h2{font-size:1.15em}
+h3{font-size:1.05em;margin:15px 0 8px}
+.header{margin-bottom:4px}
+.tele-icon{width:30px;height:30px}
+.tele-icon svg{width:16px;height:16px}
+.tele-text{font-size:0.9em}
+#jam{font-size:2em;margin-bottom:8px}
+.theme-toggle-btn{width:42px;height:42px;font-size:1.4em}
+.container-flex{flex-direction:row;gap:15px}
+.card-usd{width:220px;height:350px}
+.card-chart{flex:1;min-width:350px;height:350px}
+.dt-top-controls{flex-direction:row;justify-content:space-between;gap:8px;margin-bottom:8px;padding:6px 0}
+.dataTables_wrapper .dataTables_length{font-size:14px!important}
+.dataTables_wrapper .dataTables_filter{font-size:14px!important}
+.dataTables_wrapper .dataTables_filter input{width:100px!important;font-size:14px!important;padding:5px 8px!important}
+.dataTables_wrapper .dataTables_length select{font-size:14px!important;padding:4px!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button{padding:6px 14px!important;font-size:14px!important}
+#tabel{min-width:1000px!important;table-layout:fixed!important}
+#tabel thead th{font-size:15px!important;padding:10px 6px!important;font-weight:bold!important}
+#tabel tbody td{font-size:14px!important;padding:9px 5px!important}
+#tabel thead th.waktu,#tabel tbody td.waktu{width:80px!important;min-width:75px!important;max-width:85px!important;padding-left:3px!important;padding-right:3px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:250px!important;min-width:245px!important;max-width:255px!important;padding:8px 10px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:130px!important;min-width:125px!important;max-width:135px!important;padding-left:6px!important;padding-right:6px!important}
+.profit-order-btns{display:flex}
+.profit-btn{padding:6px 12px;font-size:13px}
+.chart-header{flex-direction:row;gap:10px}
+.chart-header h3{font-size:1em}
+.limit-label{font-size:0.9em}
+.limit-label .limit-num{font-size:1.05em;padding:2px 7px}
 .bottom-section{flex-direction:column;gap:20px}
 .calc-box{width:100%}
 .calc-cards{flex-direction:row;gap:15px}
 .calc-cards .card-calc{flex:1}
 .calendar-inner{min-width:700px;height:420px}
 }
-@media(max-width:767px){
+@media(min-width:576px) and (max-width:767px){
 body{padding:12px;padding-bottom:50px}
 h2{font-size:1.05em}
+h3{font-size:0.95em;margin:12px 0 8px}
+.header{margin-bottom:2px}
+.tele-icon{width:28px;height:28px}
+.tele-icon svg{width:15px;height:15px}
+.tele-text{font-size:0.85em}
 #jam{font-size:1.8em;margin-bottom:6px}
+.theme-toggle-btn{width:38px;height:38px;font-size:1.3em}
 .container-flex{flex-direction:column;gap:15px}
 .card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
-.card-usd{height:auto;min-height:280px}
-.card-chart{height:340px}
-.bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
+.card-usd{height:auto;min-height:300px}
+.card-chart{height:360px}
+.dt-top-controls{flex-direction:row;justify-content:space-between;gap:5px;margin-bottom:8px;padding:5px 0}
+.dataTables_wrapper .dataTables_length{font-size:13px!important}
+.dataTables_wrapper .dataTables_filter{font-size:13px!important}
+.dataTables_wrapper .dataTables_filter input{width:85px!important;font-size:13px!important;padding:4px 6px!important}
+.dataTables_wrapper .dataTables_length select{font-size:13px!important;padding:3px!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 12px!important;font-size:13px!important}
+#tabel{min-width:950px!important;table-layout:fixed!important}
+#tabel thead th{font-size:14px!important;padding:9px 5px!important;font-weight:bold!important}
+#tabel tbody td{font-size:13px!important;padding:8px 4px!important}
+#tabel thead th.waktu,#tabel tbody td.waktu{width:75px!important;min-width:70px!important;max-width:80px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:235px!important;min-width:230px!important;max-width:240px!important;padding:7px 8px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:125px!important;min-width:120px!important;max-width:130px!important;padding-left:5px!important;padding-right:5px!important}
+.profit-order-btns{display:flex}
+.profit-btn{padding:5px 10px;font-size:12px}
+.chart-header{flex-direction:row;gap:8px}
+.chart-header h3{font-size:0.95em}
+.limit-label{font-size:0.85em}
+.bottom-section{flex-direction:column;gap:18px;margin-bottom:55px}
+.calendar-box{width:100%}
 .calc-box{width:100%}
 .calc-cards{flex-direction:row;gap:12px}
 .calc-cards .card-calc{flex:1;padding:12px}
 .calendar-inner{min-width:650px;height:400px}
-.profit-order-btns{display:flex}
+.calendar-box h3,.calc-box h3{font-size:1em}
 }
-@media(max-width:575px){
+@media(min-width:480px) and (max-width:575px){
 body{padding:10px;padding-bottom:48px}
 h2{font-size:1em}
+h3{font-size:0.92em;margin:12px 0 6px}
+.header{margin-bottom:2px}
+.title-wrap{gap:6px}
+.tele-icon{width:26px;height:26px}
+.tele-icon svg{width:14px;height:14px}
+.tele-text{font-size:0.8em}
 #jam{font-size:1.5em;margin-bottom:5px}
-.theme-toggle-btn{width:38px;height:38px;font-size:1.2em}
-.bottom-section{gap:12px;margin-bottom:45px}
-.calc-cards{gap:10px}
-.calc-cards .card-calc{padding:10px}
+.theme-toggle-btn{width:36px;height:36px;font-size:1.2em}
+.container-flex{flex-direction:column;gap:12px}
+.card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
+.card-usd{height:auto;min-height:280px}
+.card-chart{height:340px}
+.card{padding:8px}
+#footerApp{padding:6px 0}
+.marquee-text{font-size:12px}
+.dt-top-controls{gap:4px;margin-bottom:6px}
+.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:12px!important}
+.dataTables_wrapper .dataTables_filter input{width:75px!important;font-size:12px!important}
+.dataTables_wrapper .dataTables_length select{font-size:12px!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button{padding:5px 10px!important;font-size:12px!important}
+#priceList{max-height:220px}
+#tabel{min-width:900px!important;table-layout:fixed!important}
+#tabel thead th{font-size:13px!important;padding:8px 4px!important;font-weight:bold!important}
+#tabel tbody td{font-size:12px!important;padding:7px 3px!important}
+#tabel thead th.waktu,#tabel tbody td.waktu{width:72px!important;min-width:68px!important;max-width:76px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:220px!important;min-width:215px!important;max-width:225px!important;padding:6px 6px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:118px!important;min-width:113px!important;max-width:123px!important;padding-left:4px!important;padding-right:4px!important}
+.profit-order-btns{display:flex}
+.profit-btn{padding:5px 9px;font-size:11px}
+.chart-header h3{font-size:0.9em}
+.limit-label{font-size:0.82em}
+.limit-label .limit-num{font-size:1em;padding:1px 6px}
+.bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
+.calendar-box{width:100%}
+.calc-box{width:100%}
+.calc-cards{flex-direction:row;gap:10px}
+.calc-cards .card-calc{flex:1;padding:10px}
 .card-calc h4{font-size:0.9em;margin-bottom:8px}
 .calc-rate{font-size:0.8em;padding:6px 8px;margin-bottom:10px}
 .calc-input-group{margin-bottom:10px}
@@ -803,30 +886,54 @@ h2{font-size:1em}
 .calc-input-group input{padding:10px;font-size:0.95em}
 .calendar-inner{min-width:600px;height:380px}
 .calendar-box h3,.calc-box h3{font-size:1em}
-.profit-order-btns{display:flex}
-.profit-btn{padding:4px 8px;font-size:11px}
 }
 @media(max-width:479px){
 body{padding:8px;padding-bottom:45px}
 h2{font-size:0.9em}
+h3{font-size:0.88em;margin:10px 0 6px}
+.header{margin-bottom:1px}
+.title-wrap{gap:5px}
+.tele-icon{width:24px;height:24px}
+.tele-icon svg{width:13px;height:13px}
+.tele-text{font-size:0.75em}
 #jam{font-size:1.3em;margin-bottom:4px}
 .theme-toggle-btn{width:34px;height:34px;font-size:1.1em}
-.tele-icon{width:26px;height:26px}
-.tele-text{font-size:0.75em}
-.bottom-section{gap:10px;margin-bottom:42px}
-.calc-cards{gap:8px}
-.calc-cards .card-calc{padding:8px}
-.card-calc h4{font-size:0.85em;gap:4px}
-.calc-rate{font-size:0.75em;padding:5px 6px}
-.calc-input-group label{font-size:0.75em}
-.calc-input-group input{padding:8px;font-size:0.9em;border-radius:4px}
-.calendar-inner{min-width:550px;height:360px}
-.calendar-box h3,.calc-box h3{font-size:0.95em}
+.container-flex{flex-direction:column;gap:10px}
+.card-usd,.card-chart{width:100%!important;max-width:100%!important;min-width:0!important}
+.card-usd{height:auto;min-height:260px}
+.card-chart{height:300px}
+.card{padding:6px}
+#footerApp{padding:5px 0}
+.marquee-text{font-size:11px}
+.dt-top-controls{gap:3px;margin-bottom:5px}
+.dataTables_wrapper .dataTables_length,.dataTables_wrapper .dataTables_filter{font-size:11px!important}
+.dataTables_wrapper .dataTables_filter input{width:60px!important;font-size:11px!important}
+.dataTables_wrapper .dataTables_length select{font-size:11px!important}
+.dataTables_wrapper .dataTables_paginate .paginate_button{padding:4px 8px!important;font-size:11px!important}
 #priceList{max-height:180px}
-.profit-order-btns{display:flex}
-.profit-btn{padding:3px 6px;font-size:10px}
-#tabel thead th{font-size:12px!important;padding:7px 3px!important}
+#tabel{min-width:850px!important;table-layout:fixed!important}
+#tabel thead th{font-size:12px!important;padding:7px 3px!important;font-weight:bold!important}
 #tabel tbody td{font-size:11px!important;padding:6px 3px!important}
+#tabel thead th.waktu,#tabel tbody td.waktu{width:68px!important;min-width:64px!important;max-width:72px!important;padding-left:2px!important;padding-right:2px!important}
+#tabel thead th.transaksi,#tabel tbody td.transaksi{width:210px!important;min-width:205px!important;max-width:215px!important;padding:5px 5px!important}
+#tabel thead th.profit,#tabel tbody td.profit{width:110px!important;min-width:105px!important;max-width:115px!important;padding-left:3px!important;padding-right:3px!important}
+.profit-order-btns{display:flex}
+.profit-btn{padding:4px 7px;font-size:10px}
+.chart-header h3{font-size:0.85em}
+.limit-label{font-size:0.78em}
+.limit-label .limit-num{font-size:0.95em;padding:1px 5px}
+.bottom-section{flex-direction:column;gap:15px;margin-bottom:48px}
+.calendar-box{width:100%}
+.calc-box{width:100%}
+.calc-cards{flex-direction:column;gap:10px}
+.calc-cards .card-calc{width:100%;padding:10px}
+.card-calc h4{font-size:0.88em;gap:4px;margin-bottom:8px}
+.calc-rate{font-size:0.78em;padding:6px 8px;margin-bottom:8px}
+.calc-input-group{margin-bottom:8px}
+.calc-input-group label{font-size:0.78em;margin-bottom:4px}
+.calc-input-group input{padding:10px;font-size:0.9em;border-radius:5px}
+.calendar-inner{min-width:520px;height:350px}
+.calendar-box h3,.calc-box h3{font-size:0.95em}
 }
 </style>
 </head>
@@ -934,7 +1041,6 @@ var blinkTimeout=null;
 var latestBuyRate=0;
 var latestSellRate=0;
 var isCalcUpdating=false;
-
 function parseRupiahInput(str){
 if(!str)return 0;
 return parseInt(str.replace(/\./g,''),10)||0;
@@ -965,78 +1071,55 @@ var buyIdr=document.getElementById('buyIdr');
 var buyGram=document.getElementById('buyGram');
 var sellIdr=document.getElementById('sellIdr');
 var sellGram=document.getElementById('sellGram');
-
 function onlyNumbers(e){
 var key=e.key;
 if(e.ctrlKey||e.metaKey)return;
 if(key==='Backspace'||key==='Delete'||key==='ArrowLeft'||key==='ArrowRight'||key==='Tab')return;
-if(!/^[0-9]$/.test(key)){
-e.preventDefault();
+if(!/^[0-9]$/.test(key)){e.preventDefault()}
 }
-}
-
 function onlyNumbersAndComma(e){
 var key=e.key;
 var val=this.value;
 if(e.ctrlKey||e.metaKey)return;
 if(key==='Backspace'||key==='Delete'||key==='ArrowLeft'||key==='ArrowRight'||key==='Tab')return;
 if(key===','||key==='.'){
-if(val.indexOf(',')!==-1||val.indexOf('.')!==-1){
-e.preventDefault();
+if(val.indexOf(',')!==-1||val.indexOf('.')!==-1){e.preventDefault();return}
 return;
 }
-return;
+if(!/^[0-9]$/.test(key)){e.preventDefault()}
 }
-if(!/^[0-9]$/.test(key)){
-e.preventDefault();
-}
-}
-
 buyIdr.addEventListener('keypress',onlyNumbers);
 sellIdr.addEventListener('keypress',onlyNumbers);
 buyGram.addEventListener('keypress',onlyNumbersAndComma);
 sellGram.addEventListener('keypress',onlyNumbersAndComma);
-
 buyIdr.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var nums=text.replace(/\D/g,'');
-if(nums){
-document.execCommand('insertText',false,nums);
-}
+if(nums){document.execCommand('insertText',false,nums)}
 });
-
 sellIdr.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var nums=text.replace(/\D/g,'');
-if(nums){
-document.execCommand('insertText',false,nums);
-}
+if(nums){document.execCommand('insertText',false,nums)}
 });
-
 buyGram.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var clean=text.replace(/[^0-9,.]/g,'').replace(/\./g,',');
 var parts=clean.split(',');
 var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
-if(result){
-document.execCommand('insertText',false,result);
-}
+if(result){document.execCommand('insertText',false,result)}
 });
-
 sellGram.addEventListener('paste',function(e){
 e.preventDefault();
 var text=(e.clipboardData||window.clipboardData).getData('text');
 var clean=text.replace(/[^0-9,.]/g,'').replace(/\./g,',');
 var parts=clean.split(',');
 var result=parts[0]+(parts.length>1?','+parts.slice(1).join(''):'');
-if(result){
-document.execCommand('insertText',false,result);
-}
+if(result){document.execCommand('insertText',false,result)}
 });
-
 buyIdr.addEventListener('input',function(){
 if(isCalcUpdating)return;
 isCalcUpdating=true;
@@ -1056,7 +1139,6 @@ buyGram.value=gram>0?formatGramCalc(gram):'';
 }
 isCalcUpdating=false;
 });
-
 buyGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestBuyRate)return;
 isCalcUpdating=true;
@@ -1065,7 +1147,6 @@ var idr=gram*latestBuyRate;
 buyIdr.value=idr>0?formatRupiahCalc(idr):'';
 isCalcUpdating=false;
 });
-
 sellGram.addEventListener('input',function(){
 if(isCalcUpdating||!latestSellRate)return;
 isCalcUpdating=true;
@@ -1074,7 +1155,6 @@ var idr=gram*latestSellRate;
 sellIdr.value=idr>0?formatRupiahCalc(idr):'';
 isCalcUpdating=false;
 });
-
 sellIdr.addEventListener('input',function(){
 if(isCalcUpdating)return;
 isCalcUpdating=true;
@@ -1096,7 +1176,6 @@ isCalcUpdating=false;
 });
 }
 setupCalcListeners();
-
 function getOrderedProfitKeys(){
 var all=['jt10','jt20','jt30','jt40','jt50'];
 var result=[profitPriority];
@@ -1297,7 +1376,6 @@ setTimeout(createTradingViewWidget,100);
 </script>
 </body>
 </html>"""
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
