@@ -732,10 +732,10 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .bottom-section{display:flex;flex-direction:row;gap:20px;margin-top:20px;margin-bottom:60px;align-items:flex-start}
 .calendar-box{flex:1;min-width:0}
 .calendar-box h3{margin:0 0 10px;font-size:1.1em;display:flex;align-items:center;gap:8px}
-.card-calendar{border:1px solid #ccc;border-radius:6px;padding:10px;height:370px;overflow:hidden}
+.card-calendar{border:1px solid #ccc;border-radius:6px;padding:10px;height:520px;overflow:hidden}
 .dark-mode .card-calendar{border-color:#444;background:#23272b}
-.calendar-scroll-wrapper{width:100%;height:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
-.calendar-scroll-wrapper iframe{min-width:650px;width:100%;height:320px;border:none}
+.calendar-scroll-wrapper{width:100%;height:calc(100% - 30px);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.calendar-scroll-wrapper iframe{min-width:650px;width:100%;height:100%;border:none}
 .calendar-credit{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#333;margin-top:8px;text-align:center}
 .calendar-credit a{color:#06529D;font-weight:bold;text-decoration:none}
 .calendar-credit a:hover{text-decoration:underline}
@@ -799,8 +799,7 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .bottom-section{flex-direction:row;gap:15px}
 .calendar-box{flex:1;min-width:0}
 .calc-box{width:280px}
-.card-calendar{height:350px}
-.calendar-scroll-wrapper iframe{height:300px}
+.card-calendar{height:500px}
 .calc-cards{flex-direction:column;gap:10px}
 .calc-cards .card-calc{padding:12px}
 .card-calc h4{font-size:0.95em}
@@ -842,8 +841,7 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .bottom-section{flex-direction:column;gap:18px;margin-bottom:55px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
-.card-calendar{height:360px}
-.calendar-scroll-wrapper iframe{height:310px}
+.card-calendar{height:480px}
 .calendar-box h3{font-size:1em}
 .calc-cards{flex-direction:row;gap:12px}
 .calc-cards .card-calc{flex:1;padding:12px}
@@ -888,8 +886,7 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
-.card-calendar{height:340px}
-.calendar-scroll-wrapper iframe{height:290px}
+.card-calendar{height:450px}
 .calendar-box h3{font-size:0.95em}
 .calc-cards{flex-direction:row;gap:10px}
 .calc-cards .card-calc{flex:1;padding:10px}
@@ -939,8 +936,7 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:48px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
-.card-calendar{height:300px}
-.calendar-scroll-wrapper iframe{height:250px}
+.card-calendar{height:420px}
 .calendar-box h3{font-size:0.9em}
 .calc-cards{flex-direction:column;gap:10px}
 .calc-cards .card-calc{width:100%;padding:10px}
