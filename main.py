@@ -727,8 +727,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 @keyframes blink-yellow-dark{0%,100%{background-color:#23272b}50%{background-color:#ffd600}}
 #tabel tbody tr.blink-row td.waktu{animation:blink-yellow 0.4s ease-in-out 5}
 .dark-mode #tabel tbody tr.blink-row td.waktu{animation:blink-yellow-dark 0.4s ease-in-out 5}
-
-/* Bottom Section - Calendar & Calculator */
 .bottom-section{display:flex;flex-direction:row;gap:20px;margin-top:20px;margin-bottom:60px;align-items:flex-start}
 .calendar-box{flex:1;min-width:0}
 .calendar-box h3{margin:0 0 10px;font-size:1.1em;display:flex;align-items:center;gap:8px}
@@ -741,7 +739,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .calendar-credit a:hover{text-decoration:underline}
 .dark-mode .calendar-credit{color:#aaa}
 .dark-mode .calendar-credit a{color:#ffb300}
-
 .calc-box{width:300px;flex-shrink:0}
 .calc-box h3{margin:0 0 10px;font-size:1.1em}
 .calc-cards{display:flex;flex-direction:column;gap:12px}
@@ -763,7 +760,6 @@ th.profit,td.profit{width:155px;min-width:145px;max-width:165px;text-align:left;
 .dark-mode .calc-input-group input:focus{border-color:#ffb300;box-shadow:0 0 0 3px rgba(255,179,0,0.15)}
 .calc-input-group input::placeholder{color:#999}
 .dark-mode .calc-input-group input::placeholder{color:#666}
-
 @media(min-width:768px) and (max-width:1024px){
 body{padding:15px;padding-bottom:50px}
 h2{font-size:1.15em}
@@ -795,7 +791,6 @@ h3{font-size:1.05em;margin:15px 0 8px}
 .chart-header h3{font-size:1em}
 .limit-label{font-size:0.9em}
 .limit-label .limit-num{font-size:1.05em;padding:2px 7px}
-/* Bottom section tablet - side by side */
 .bottom-section{flex-direction:row;gap:15px}
 .calendar-box{flex:1;min-width:0}
 .calc-box{width:280px}
@@ -837,7 +832,6 @@ h3{font-size:0.95em;margin:12px 0 8px}
 .chart-header{flex-direction:row;gap:8px}
 .chart-header h3{font-size:0.95em}
 .limit-label{font-size:0.85em}
-/* Bottom section mobile - stacked */
 .bottom-section{flex-direction:column;gap:18px;margin-bottom:55px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
@@ -882,7 +876,6 @@ h3{font-size:0.92em;margin:12px 0 6px}
 .chart-header h3{font-size:0.9em}
 .limit-label{font-size:0.82em}
 .limit-label .limit-num{font-size:1em;padding:1px 6px}
-/* Bottom section - stacked */
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:50px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
@@ -932,7 +925,6 @@ h3{font-size:0.88em;margin:10px 0 6px}
 .chart-header h3{font-size:0.85em}
 .limit-label{font-size:0.78em}
 .limit-label .limit-num{font-size:0.95em;padding:1px 5px}
-/* Bottom section - stacked */
 .bottom-section{flex-direction:column;gap:15px;margin-bottom:48px}
 .calendar-box{width:100%}
 .calc-box{width:100%}
@@ -993,14 +985,12 @@ h3{font-size:0.88em;margin:10px 0 6px}
 </div>
 </div>
 </div>
-
-<!-- Bottom Section: Calendar & Calculator Side by Side -->
 <div class="bottom-section">
 <div class="calendar-box">
 <h3>📅 Kalender Ekonomi</h3>
 <div class="card card-calendar">
 <div class="calendar-scroll-wrapper">
-<iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_economicActivity,_inflation,_centralBanks&importance=3&features=datepicker,timezone&countries=5,25,37,48,4,35,17,12,72&calType=week&timeZone=27&lang=54" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+<iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_employment,_economicActivity,_inflation,_credit,_centralBanks,_confidenceIndex,_balance,_Bonds&importance=3&features=datepicker,timezone,timeselector,filters&countries=5,25,37,48,4,35,17,22,12,72&calType=week&timeZone=27&lang=54" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
 </div>
 <div class="calendar-credit">
 <span>Kalender Ekonomi Real Time dipersembahkan oleh <a href="https://id.investing.com" rel="nofollow" target="_blank">Investing.com Indonesia</a>.</span>
@@ -1018,8 +1008,8 @@ h3{font-size:0.88em;margin:10px 0 6px}
 <input type="text" id="buyIdr" inputmode="numeric" placeholder="Contoh: 88.000.000">
 </div>
 <div class="calc-input-group">
-<label>Hasil Gram</label>
-<input type="text" id="buyGram" inputmode="decimal" placeholder="Contoh: 0.8888">
+<label>Gram ⇆</label>
+<input type="text" id="buyGram" inputmode="decimal" placeholder="isi gram, contoh: 0.8888">
 </div>
 </div>
 <div class="card-calc">
@@ -1030,14 +1020,13 @@ h3{font-size:0.88em;margin:10px 0 6px}
 <input type="text" id="sellGram" inputmode="decimal" placeholder="Contoh: 0.8888">
 </div>
 <div class="calc-input-group">
-<label>Hasil Rupiah (IDR)</label>
-<input type="text" id="sellIdr" inputmode="numeric" placeholder="Contoh: 88.000.000">
+<label>Rupiah (IDR) ⇆</label>
+<input type="text" id="sellIdr" inputmode="numeric" placeholder="isi nominal, contoh: 88.000.000">
 </div>
 </div>
 </div>
 </div>
 </div>
-
 <footer id="footerApp"><span class="marquee-text">&copy;2026 ~ahmadkholil~</span></footer>
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
